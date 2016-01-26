@@ -540,14 +540,22 @@ static void USBH_UserProcess(USBH_HandleTypeDef *pHost, uint8_t vId) {
   }
 }
 
+
+extern USBH_ClassTypeDef  Vendor_Class;
+#define USBH_VENDOR_CLASS  &Vendor_Class
+
+
+
 void MY_USBH_Init(void) {
 
   /* Init Host Library */
   USBH_Init(&hUSBHost, USBH_UserProcess, 0);
 
   /* Add Supported Class */
-  USBH_RegisterClass(&hUSBHost, USBH_HID_CLASS);
+  /* highest priority first */
+  USBH_RegisterClass(&hUSBHost, USBH_VENDOR_CLASS);
   USBH_RegisterClass(&hUSBHost, USBH_MIDI_CLASS);
+  USBH_RegisterClass(&hUSBHost, USBH_HID_CLASS);
 
   /* Start Host Process */
   USBH_Start(&hUSBHost);

@@ -21,6 +21,9 @@ import axoloti.MainFrame;
 import axoloti.Patch;
 import axoloti.PatchFrame;
 import axoloti.PatchGUI;
+import axoloti.inlets.InletInstance;
+import axoloti.outlets.OutletInstance;
+import axoloti.parameters.ParameterInstance;
 import components.ButtonComponent;
 import components.ButtonComponent.ActListener;
 import java.awt.Component;
@@ -83,6 +86,7 @@ public class AxoObjectInstancePatcher extends AxoObjectInstance {
             pg.setFileNamePath(getInstanceName());
             pg.PostContructor();
         }
+        pf.setState(java.awt.Frame.NORMAL);
         pf.setVisible(true);
     }
 

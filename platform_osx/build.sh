@@ -27,19 +27,20 @@ fi
 if [ ! -d "${PLATFORM_ROOT}/../chibios" ]; 
 then
     cd "${PLATFORM_ROOT}/src"
-    ARDIR=ChibiOS_2.6.8
+    CH_VERSION=2.6.9
+    ARDIR=ChibiOS_${CH_VERSION}
     ARCHIVE=${ARDIR}.zip
     if [ ! -f ${ARCHIVE} ]; 
     then
         echo "downloading ${ARCHIVE}"
-        curl -L http://sourceforge.net/projects/chibios/files/ChibiOS_RT%20stable/Version%202.6.8/$ARCHIVE > $ARCHIVE
+        curl -L http://sourceforge.net/projects/chibios/files/ChibiOS_RT%20stable/Version%20${CH_VERSION}/${ARCHIVE} > ${ARCHIVE}
     else
         echo "${ARCHIVE} already downloaded"
     fi
-    unzip -o ${ARCHIVE}
+    unzip -q -o ${ARCHIVE}
     mv ${ARDIR} chibios
     cd chibios/ext
-    unzip -o ./fatfs-0.9-patched.zip
+    unzip -q -o ./fatfs-0.9-patched.zip
     cd ../../
     mv chibios ../..
 else
@@ -57,9 +58,9 @@ then
     else
         echo "${ARCHIVE} already downloaded"
     fi
-    tar xfvj ${ARCHIVE}
+    tar xfj ${ARCHIVE}
     cp -r gcc-arm-none-eabi-4_9-2015q2/* ..
-    rm -rv gcc-arm-none-eabi-4_9-2015q2
+    rm -r gcc-arm-none-eabi-4_9-2015q2
 else
     echo "bin/arm-none-eabi-gcc already present, skipping..."
 fi
@@ -77,7 +78,7 @@ then
     else
         echo "${ARCHIVE} already downloaded"
     fi
-    tar xfvj ${ARCHIVE}
+    tar xfj ${ARCHIVE}
     
     cd "${PLATFORM_ROOT}/src/libusb-1.0.19"
 
@@ -113,7 +114,7 @@ then
     else
         echo "$ARCHIVE already downloaded"
     fi
-    tar xfvz ${ARCHIVE}
+    tar xfz ${ARCHIVE}
 
     cd "${PLATFORM_ROOT}/src/${ARDIR}"
     ./configure --prefix="${PLATFORM_ROOT}/i386" USB_LIBS="${PLATFORM_ROOT}/lib/libusb-1.0.0.dylib" USB_CFLAGS=-I${PLATFORM_ROOT}/i386/include/libusb-1.0/ CFLAGS="-arch i386 -mmacosx-version-min=10.5" LDFLAGS="-arch i386"
@@ -148,7 +149,7 @@ then
         echo "${ARCHIVE} already downloaded"
     fi
 
-    tar xfvz $ARCHIVE
+    tar xfz $ARCHIVE
 
     cd "${PLATFORM_ROOT}/src/${ARDIR}"
     ./configure --prefix="${PLATFORM_ROOT}/i386" CFLAGS="-arch i386 -mmacosx-version-min=10.5" LDFLAGS="-arch i386"
@@ -173,6 +174,7 @@ file "${PLATFORM_ROOT}/bin/dfu-util"
 file "${PLATFORM_ROOT}/bin/libusb-1.0.0.dylib"
 
 echo "##### building firmware... #####"
+cd "$PLATFORM_ROOT"
 ./compile_firmware.sh
 
 echo "##### building GUI... #####"

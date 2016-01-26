@@ -29,8 +29,8 @@ import org.simpleframework.xml.Attribute;
  *
  * @author Johannes Taelman
  */
-public class ParameterInstanceFrac32UMapVSlider extends ParameterInstanceFrac32U {
-
+public class ParameterInstanceFrac32UMapVSlider extends ParameterInstanceFrac32U<ParameterFrac32UMapVSlider> {
+    
     public ParameterInstanceFrac32UMapVSlider() {
     }
 
@@ -65,9 +65,8 @@ public class ParameterInstanceFrac32UMapVSlider extends ParameterInstanceFrac32U
                     continue;
                 }
                 int modulation_index = mod.Modulations.indexOf(m);
-                s += "  PExModulationSources[" + mod.getCName() + "][" + modulation_index + "].PEx = &" + PExName(vprefix) + ";\n";
-                s += "  PExModulationSources[" + mod.getCName() + "][" + modulation_index + "].amount = " + m.getValue().getRaw() + ";\n";
-                s += "  PExModulationSources[" + mod.getCName() + "][" + modulation_index + "].prod = 0;\n";
+                s += "  parent->PExModulationSources[parent->" + mod.getCName() + "][" + modulation_index + "].parameterIndex = " + indexName() + ";\n";
+                s += "  parent->PExModulationSources[parent->" + mod.getCName() + "][" + modulation_index + "].amount = " + m.getValue().getRaw() + ";\n";
             }
         }
         return s;

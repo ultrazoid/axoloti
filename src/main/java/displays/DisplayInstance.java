@@ -17,7 +17,9 @@
  */
 package displays;
 
+import axoloti.atom.AtomInstance;
 import axoloti.object.AxoObjectInstance;
+import axoloti.object.AxoObjectInstanceAbstract;
 import components.LabelComponent;
 import java.nio.ByteBuffer;
 import javax.swing.BoxLayout;
@@ -28,21 +30,31 @@ import org.simpleframework.xml.Attribute;
  *
  * @author Johannes Taelman
  */
-public abstract class DisplayInstance extends JPanel {
+public abstract class DisplayInstance<T extends Display> extends JPanel implements AtomInstance<T> {
 
     @Attribute
-    public String name;
+    String name;
     @Attribute(required = false)
     Boolean onParent;
     protected int index;
-    public Display display;
-    public AxoObjectInstance axoObj;
+    public T display;
+    AxoObjectInstance axoObj;
     protected int offset;
 
     public DisplayInstance() {
     }
 
-    public String GetCName(){
+    @Override
+    public AxoObjectInstanceAbstract GetObjectInstance() {
+        return axoObj;
+    }
+
+    @Override
+    public T GetDefinition() {
+        return display;
+    }    
+    
+    public String GetCName() {
         return display.GetCName();
     }
 

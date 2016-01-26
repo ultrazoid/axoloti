@@ -17,6 +17,7 @@
  */
 package displays;
 
+import axoloti.atom.AtomDefinition;
 import axoloti.datatypes.DataType;
 import axoloti.object.AxoObjectInstance;
 import java.security.MessageDigest;
@@ -26,10 +27,10 @@ import org.simpleframework.xml.Attribute;
  *
  * @author Johannes Taelman
  */
-public abstract class Display {
+public abstract class Display<T extends DisplayInstance> implements AtomDefinition {
 
     @Attribute
-    public String name;
+    String name;
     @Attribute(required = false)
     public Boolean noLabel;
 
@@ -40,6 +41,11 @@ public abstract class Display {
         this.name = name;
     }
 
+    @Override
+    public String getName() {
+        return name;
+    }
+    
     public int getLength() {
         return 1;
     }
@@ -48,38 +54,18 @@ public abstract class Display {
         return "disp_" + name;
     }    
     
+    @Override
     public DisplayInstance CreateInstance(AxoObjectInstance o) {
-        // resolve deserialized object, copy value and remove
-        DisplayInstance pidn = null;
-        for (DisplayInstance pi : o.displayInstances) {
-//            System.out.println("compare " + this.name + "<>" + pi.name);
-            if (pi.name.equals(this.name)) {
-                pidn = (DisplayInstance1) pi;
-                break;
-            }
-        }
-        if (pidn == null) {
-//            System.out.println("no match " + this.name);
-            DisplayInstance pi = InstanceFactory();
-            pi.axoObj = o;
-            pi.name = this.name;
-            pi.display = this;
-//            pi.SetValue(DefaultValue);
-            o.p_displays.add(pi);
-            pi.PostConstructor();
-            return pi;
-        } else {
-//            System.out.println("match" + pidn.getName());
-            o.parameterInstances.remove(pidn);
-            pidn.axoObj = o;
-            pidn.display = this;
-            pidn.PostConstructor();
-            o.p_displays.add(pidn);
-            return pidn;
-        }
+        DisplayInstance pi = InstanceFactory();
+        pi.axoObj = o;
+        pi.name = this.name;
+        pi.display = this;
+        o.p_displays.add(pi);
+        pi.PostConstructor();
+        return pi;
     }
 
-    public abstract DisplayInstance InstanceFactory();
+    public abstract T InstanceFactory();
 
     public abstract DataType getDatatype();
 

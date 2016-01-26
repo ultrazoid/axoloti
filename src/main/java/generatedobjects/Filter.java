@@ -72,9 +72,9 @@ public class Filter extends gentools {
         WriteAxoObject(catName, Create_lpfsvf_tilde());
         WriteAxoObject(catName, Create_hpfsvf_tilde());
         WriteAxoObject(catName, Create_bpfsvf_tilde());
+        WriteAxoObject(catName, Create_svf_multimode_tilde());
 
 //UNRELEASED        WriteAxoObject(catName, Create_lpfsvf_drive());
-
         WriteAxoObject(catName, Create_bp_svf_m());
 
 //        WriteAxoObject(catName, Create_lpfsvf2_tilde());
@@ -95,7 +95,9 @@ public class Filter extends gentools {
 
         o.sLocalData = "data_filter_biquad_A fd;\n";
         o.sInitCode = "  init_filter_biquad_A(&fd);\n";
-        o.sKRateCode = " f_filter_biquad_A(&fd,%in%,%out%,%frequency%,INT_MAX - (__USAT(inlet_reso,27)<<4));\n";
+        o.sKRateCode = "      int32_t freq;\n"
+                + "      MTOF(inlet_frequency,freq);\n"
+                + " f_filter_biquad_A(&fd,inlet_in,outlet_out,freq,INT_MAX - (__USAT(inlet_reso,27)<<4));\n";
         return o;
     }
 
@@ -288,7 +290,7 @@ public class Filter extends gentools {
         AxoObject o = new AxoObject("hp1", "1st order hipass filter");
         o.inlets.add(new InletFrac32Buffer("in", "input"));
         o.outlets.add(new OutletFrac32Buffer("out", "output"));
-        o.params.add(new ParameterFrac32UMap("freq"));
+        o.params.add(new ParameterFrac32SMapPitch("freq"));
         o.sLocalData = "int32_t val;\n";
         o.sInitCode = "val = 0;\n";
         o.sKRateCode = "int32_t f;\n"
@@ -623,6 +625,38 @@ public class Filter extends gentools {
                 + "band = (___SMMUL(freq,high)<<1) + band;// - drive*band*band*band;\n"
                 + "int32_t out1 = band;\n"
                 + "%out% = out1;\n";
+        return o;
+    }
+
+    static AxoObject Create_svf_multimode_tilde() {
+        AxoObject o = new AxoObject("multimode svf m", "multimode filter, state-variable type, modulation inputs");
+        o.inlets.add(new InletFrac32Buffer("in", "filter input"));
+        o.inlets.add(new InletFrac32("pitch", "pitch"));
+        o.inlets.add(new InletFrac32("reso", "resonance"));
+        o.params.add(new ParameterFrac32SMapPitch("pitch"));
+        o.params.add(new ParameterFrac32UMapFilterQ("reso"));
+        o.outlets.add(new OutletFrac32Buffer("hp", "highpass filter output"));
+        o.outlets.add(new OutletFrac32Buffer("bp", "bandpass filter output"));
+        o.outlets.add(new OutletFrac32Buffer("lp", "lowpass filter output"));
+        o.sLocalData = "int32_t low;\n"
+                + "int32_t band;\n";
+        o.sInitCode = "low = 0;\n"
+                + "band = 0;\n";
+        o.sKRateCode = "int32_t damp = (0x80<<24) - (__USAT(inlet_reso + param_reso,27)<<4);\n"
+                + "damp = ___SMMUL(damp,damp);\n"
+                + "int32_t alpha;\n"
+                + "int32_t freq;\n"
+                + "int32_t pitch = __SSAT(param_pitch+inlet_pitch,28);\n"
+                + "MTOFEXTENDED(pitch,alpha);\n"
+                + "SINE2TINTERP(alpha,freq);\n";
+        o.sSRateCode = "int32_t in1 = %in%;\n"
+                + "int32_t notch = %in% - (___SMMUL(damp,band)<<1);\n"
+                + "low = low + (___SMMUL(freq,band)<<1);\n"
+                + "int32_t high  = notch - low;\n"
+                + "band = (___SMMUL(freq,high)<<1) + band;// - drive*band*band*band;\n"
+                + "%lp% = low;\n"
+                + "%hp% = high;\n"
+                + "%bp% = band;\n";
         return o;
     }
 

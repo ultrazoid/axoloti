@@ -1,5 +1,5 @@
 #!/bin/sh
-export PATH=$PATH:${axoloti_runtime}/platform_linux/bin
+export PATH=${axoloti_runtime}/platform_linux/bin:$PATH
 
 cd "${axoloti_firmware}"
 make -f Makefile.patch clean
@@ -16,3 +16,11 @@ cd flasher
 mkdir -p flasher_build/lst
 mkdir -p flasher_build/obj
 make
+cd ..
+
+echo "Compiling firmware mounter..."
+cd mounter
+mkdir -p mounter_build/lst
+mkdir -p mounter_build/obj
+make
+cd ..

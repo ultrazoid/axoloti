@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2013, 2014 Johannes Taelman
+ * Copyright (C) 2013 - 2016 Johannes Taelman
  *
  * This file is part of Axoloti.
  *
@@ -21,13 +21,14 @@ package axoloti.attributedefinition;
  *
  * @author Johannes Taelman
  */
+import axoloti.atom.AtomDefinition;
 import axoloti.attribute.AttributeInstance;
 import axoloti.object.AxoObjectInstance;
 import axoloti.utils.CharEscape;
 import java.security.MessageDigest;
 import org.simpleframework.xml.Attribute;
 
-public abstract class AxoAttribute {
+public abstract class AxoAttribute implements AtomDefinition {
 
     @Attribute
     String name;
@@ -39,57 +40,37 @@ public abstract class AxoAttribute {
         this.name = name;
     }
 
+    @Override
     public String getName() {
         return name;
     }
 
+    @Override
     public AttributeInstance CreateInstance(AxoObjectInstance o) {
-        // resolve deserialized object, copy value and remove
-        AttributeInstance pidn = null;
-        for (AttributeInstance pi : o.getAttributeInstances()) {
-//            System.out.println("compare " + this.name + "<>" + pi.name);
-            if (pi.getAttributeName().equals(this.name)) {
-                /*
-                 if (InstanceFactory().getClass().isInstance(pi)) {
-                 pidn = (AttributeInstance) pi;
-                 } else {
-                 o.getAttributeInstances().remove(pi);
-                 }*/
-                pidn = (AttributeInstance) pi;
-                break;
-            }
-        }
-        if (pidn == null) {
-//            System.out.println("no match " + this.name);
-            AttributeInstance pi = InstanceFactory();
-            pi.axoObj = o;
-            pi.attributeName = this.name;
-            pi.attr = this;
-//            pi.SetValue(DefaultValue);
-            o.add(pi);
-            pi.PostConstructor();
-            return pi;
-        } else {
-//            System.out.println("match" + pidn.getName());
-            o.getAttributeInstances().remove(pidn);
-            AttributeInstance pi = InstanceFactory();
-            pi.axoObj = o;
-            pi.attributeName = this.name;
-            pi.attr = this;
-            pi.CopyValueFrom(pidn);
-            o.add(pi);
-            pi.PostConstructor();
-            return pi;
-        }
+        AttributeInstance pi = InstanceFactory(o);
+        o.add(pi);
+        pi.PostConstructor();
+        return pi;
     }
 
-    public abstract AttributeInstance InstanceFactory();
+    public AttributeInstance CreateInstance(AxoObjectInstance o, AttributeInstance a) {
+        AttributeInstance pi = InstanceFactory(o);
+        if (a != null) {
+            pi.CopyValueFrom(a);
+        }
+        o.add(pi);
+        pi.PostConstructor();
+        return pi;
+    }
+
+    public abstract AttributeInstance InstanceFactory(AxoObjectInstance o);
 
     public void updateSHA(MessageDigest md) {
         md.update(name.getBytes());
     }
-    
-    public String GetCName(){
+
+    public String GetCName() {
         return "attr_" + CharEscape.CharEscape(name);
     }
+
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2013, 2014, 2015 Johannes Taelman
+ * Copyright (C) 2013 - 2016 Johannes Taelman
  *
  * This file is part of Axoloti.
  *
@@ -20,6 +20,7 @@ package axoloti;
 import axoloti.attribute.AttributeInstance;
 import axoloti.attributedefinition.AxoAttributeComboBox;
 import axoloti.inlets.InletBool32;
+import axoloti.inlets.InletCharPtr32;
 import axoloti.inlets.InletFrac32;
 import axoloti.inlets.InletFrac32Buffer;
 import axoloti.inlets.InletInstance;
@@ -36,12 +37,13 @@ import axoloti.object.AxoObjectInstanceZombie;
 import axoloti.object.AxoObjectZombie;
 import axoloti.object.AxoObjects;
 import axoloti.outlets.OutletBool32;
+import axoloti.outlets.OutletCharPtr32;
 import axoloti.outlets.OutletFrac32;
 import axoloti.outlets.OutletFrac32Buffer;
 import axoloti.outlets.OutletInstance;
 import axoloti.outlets.OutletInt32;
 import axoloti.parameters.ParameterInstance;
-import axoloti.utils.Constants;
+import axoloti.utils.Preferences;
 import displays.DisplayInstance;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -77,11 +79,11 @@ import qcmds.QCmdUploadPatch;
 public class Patch {
 
     public @ElementListUnion({
-        @ElementList(entry = "obj", type = AxoObjectInstance.class, inline = true),
-        @ElementList(entry = "patcher", type = AxoObjectInstancePatcher.class, inline = true),
-        @ElementList(entry = "comment", type = AxoObjectInstanceComment.class, inline = true),
-        @ElementList(entry = "hyperlink", type = AxoObjectInstanceHyperlink.class, inline = true),
-        @ElementList(entry = "zombie", type = AxoObjectInstanceZombie.class, inline = true)})
+        @ElementList(entry = "obj", type = AxoObjectInstance.class, inline = true, required = false),
+        @ElementList(entry = "patcher", type = AxoObjectInstancePatcher.class, inline = true, required = false),
+        @ElementList(entry = "comment", type = AxoObjectInstanceComment.class, inline = true, required = false),
+        @ElementList(entry = "hyperlink", type = AxoObjectInstanceHyperlink.class, inline = true, required = false),
+        @ElementList(entry = "zombie", type = AxoObjectInstanceZombie.class, inline = true, required = false)})
     ArrayList<AxoObjectInstanceAbstract> objectinstances = new ArrayList<AxoObjectInstanceAbstract>();
     @ElementList(name = "nets")
     ArrayList<Net> nets = new ArrayList<Net>();
@@ -104,6 +106,7 @@ public class Patch {
 
     // patch this patch is contained in
     private Patch container = null;
+    private AxoObjectInstanceAbstract controllerinstance;
 
     public boolean presetUpdatePending = false;
 
@@ -124,7 +127,6 @@ public class Patch {
 
     void GoLive() {
         ShowPreset(0);
-        ClearDirty();
         WriteCode();
         presetUpdatePending = false;
         GetQCmdProcessor().SetPatch(null);
@@ -134,8 +136,8 @@ public class Patch {
         GetQCmdProcessor().AppendToQueue(new QCmdStart(this));
         GetQCmdProcessor().AppendToQueue(new QCmdLock(this));
     }
-    
-public void ShowCompileFail() {
+
+    public void ShowCompileFail() {
         Unlock();
     }
 
@@ -232,7 +234,7 @@ public void ShowCompileFail() {
 
     public void SetDirty() {
         dirty = true;
-        if(container != null) {
+        if (container != null) {
             container.SetDirty();
         }
     }
@@ -251,15 +253,14 @@ public void ShowCompileFail() {
         return dirty;
     }
 
-    
     public Patch container() {
         return container;
-    }        
+    }
 
     public void container(Patch c) {
         container = c;
-    }        
-    
+    }
+
     public AxoObjectInstanceAbstract AddObjectInstance(AxoObjectAbstract obj, Point loc) {
         if (!IsLocked()) {
             if (obj == null) {
@@ -324,11 +325,11 @@ public void ShowCompileFail() {
 
     public Net AddConnection(InletInstance il, OutletInstance ol) {
         if (!IsLocked()) {
-            if (il.axoObj.patch != this) {
+            if (il.GetObjectInstance().patch != this) {
                 Logger.getLogger(Patch.class.getName()).log(Level.INFO, "can't connect: different patch");
                 return null;
             }
-            if (ol.axoObj.patch != this) {
+            if (ol.GetObjectInstance().patch != this) {
                 Logger.getLogger(Patch.class.getName()).log(Level.INFO, "can't connect: different patch");
                 return null;
             }
@@ -387,11 +388,11 @@ public void ShowCompileFail() {
                 Logger.getLogger(Patch.class.getName()).log(Level.INFO, "can't connect: same inlet");
                 return null;
             }
-            if (il.axoObj.patch != this) {
+            if (il.GetObjectInstance().patch != this) {
                 Logger.getLogger(Patch.class.getName()).log(Level.INFO, "can't connect: different patch");
                 return null;
             }
-            if (ol.axoObj.patch != this) {
+            if (ol.GetObjectInstance().patch != this) {
                 Logger.getLogger(Patch.class.getName()).log(Level.INFO, "can't connect: different patch");
                 return null;
             }
@@ -694,12 +695,19 @@ public void ShowCompileFail() {
 
     public HashSet<String> getIncludes() {
         HashSet<String> includes = new HashSet<String>();
+        if (controllerinstance != null) {
+            Set<String> i = controllerinstance.getType().GetIncludes();
+            if (i != null) {
+                includes.addAll(i);
+            }
+        }
         for (AxoObjectInstanceAbstract o : objectinstances) {
             Set<String> i = o.getType().GetIncludes();
             if (i != null) {
                 includes.addAll(i);
             }
         }
+
         return includes;
     }
 
@@ -729,6 +737,13 @@ public void ShowCompileFail() {
 
     /* the c++ code generator */
     String GeneratePexchAndDisplayCode() {
+        String c = GeneratePexchAndDisplayCodeV();
+        c += "    PExModulationTarget_t PExModulationSources[NMODULATIONSOURCES][NMODULATIONTARGETS];\n";
+        c += "    int32_t PExModulationPrevVal[attr_poly][NMODULATIONSOURCES];\n";
+        return c;
+    }
+
+    String GeneratePexchAndDisplayCodeV() {
         String c = "";
         c += "    static const uint32_t NPEXCH = " + +ParameterInstances.size() + ";\n";
         c += "    ParameterExchange_t PExch[NPEXCH];\n";
@@ -737,20 +752,6 @@ public void ShowCompileFail() {
         c += "    static const uint32_t NPRESET_ENTRIES = " + settings.GetNPresetEntries() + ";\n";
         c += "    static const uint32_t NMODULATIONSOURCES = " + settings.GetNModulationSources() + ";\n";
         c += "    static const uint32_t NMODULATIONTARGETS = " + settings.GetNModulationTargetsPerSource() + ";\n";
-        c += "    PExModulationTarget_t PExModulationSources[NMODULATIONSOURCES][NMODULATIONTARGETS];\n";
-        /*
-         c += "    void PExParameterChange(int index, int32_t value, int32_t mask) {\n"
-         + "  PExch[index].modvalue -= (patchMeta.pPExch)[index].value;\n"
-         + "  PExch[index].value = value;\n"
-         + "  PExch[index].modvalue += (patchMeta.pPExch)[index].value;\n"
-         + "  PExch[index].signals = mask;\n"
-         + "  if (PExch[index].pfunction) {\n"
-         + "    PExch[index].finalvalue =  (PExch[index].pfunction)(PExch[index].modvalue,index);\n"
-         + "  } else {\n"
-         + "    PExch[index].finalvalue = PExch[index].modvalue;\n"
-         + "  }\n"
-         + "}";
-         */
         return c;
     }
 
@@ -768,14 +769,26 @@ public void ShowCompileFail() {
             c += "/* parameter instance indices */\n";
             int k = 0;
             for (ParameterInstance p : ParameterInstances) {
-                c += "static const int PARAM_INDEX_" + p.axoObj.getLegalName() + "_" + p.getLegalName() + " = " + k + ";\n";
+                c += "static const int PARAM_INDEX_" + p.GetObjectInstance().getLegalName() + "_" + p.getLegalName() + " = " + k + ";\n";
                 k++;
             }
+        }
+        c += "/* controller classes */\n";
+        if (controllerinstance != null) {
+            c += controllerinstance.GenerateClass(classname, OnParentAccess, enableOnParent);
         }
         c += "/* object classes */\n";
         for (AxoObjectInstanceAbstract o : objectinstances) {
             c += o.GenerateClass(classname, OnParentAccess, enableOnParent);
         }
+        c += "/* controller instances */\n";
+        if (controllerinstance != null) {
+            String s = controllerinstance.getCInstanceName();
+            if (!s.isEmpty()) {
+                c += "     " + s + " " + s + "_i;\n";
+            }
+        }
+
         c += "/* object instances */\n";
         for (AxoObjectInstanceAbstract o : objectinstances) {
             String s = o.getCInstanceName();
@@ -872,6 +885,20 @@ public void ShowCompileFail() {
 
     String GenerateObjInitCodePlusPlusSub(String className, String parentReference) {
         String c = "";
+        if (controllerinstance != null) {
+            String s = controllerinstance.getCInstanceName();
+            if (!s.isEmpty()) {
+                c += "   " + s + "_i.Init(" + parentReference;
+                for (DisplayInstance i : controllerinstance.GetDisplayInstances()) {
+                    if (i.display.getLength() > 0) {
+                        c += ", ";
+                        c += i.valueName("");
+                    }
+                }
+                c += " );\n";
+            }
+        }
+
         for (AxoObjectInstanceAbstract o : objectinstances) {
             String s = o.getCInstanceName();
             if (!s.isEmpty()) {
@@ -909,9 +936,13 @@ public void ShowCompileFail() {
         c += "      PExch[j].pfunction = 0;\n";
 //        c += "      PExch[j].finalvalue = p[j];\n"; /*TBC*/
         c += "   }\n";
+        c += "   int32_t *pp = &PExModulationPrevVal[0][0];\n";
+        c += "   for(j=0;j<attr_poly*NMODULATIONSOURCES;j++){\n";
+        c += "      *pp = 0; pp++;\n";
+        c += "   }\n";
         c += "   for(i=0;i<NMODULATIONSOURCES;i++) {\n"
                 + "	 for(j=0;j<NMODULATIONTARGETS;j++) {\n"
-                + "	   PExModulationSources[i][j].PEx = 0;\n"
+                + "	   PExModulationSources[i][j].parameterIndex = -1;\n"
                 + "	 }\n"
                 + "   };\n";
         c += "     displayVector[0] = 0x446F7841;\n"; // "AxoD"
@@ -941,6 +972,13 @@ public void ShowCompileFail() {
                 c += "   " + o.getCInstanceName() + "_i.Dispose();\n";
             }
         }
+        if (controllerinstance != null) {
+            String s = controllerinstance.getCInstanceName();
+            if (!s.isEmpty()) {
+                c += "   " + controllerinstance.getCInstanceName() + "_i.Dispose();\n";
+            }
+        }
+
         return c;
     }
 
@@ -970,83 +1008,14 @@ public void ShowCompileFail() {
         c += "  static const int32buffer zerobuffer = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};\n";
         c += "  int32buffer UNCONNECTED_OUTPUT_BUFFER;\n";
         c += "//--------- </zero> ----------//\n";
+
+        c += "//--------- <controller calls> ----------//\n";
+        if (controllerinstance != null) {
+            c += GenerateDSPCodePlusPlusSubObj(controllerinstance, ClassName, enableOnParent);
+        }
         c += "//--------- <object calls> ----------//\n";
         for (AxoObjectInstanceAbstract o : objectinstances) {
-            String s = o.getCInstanceName();
-            if (s.isEmpty()) {
-                continue;
-            }
-            c += "  " + o.getCInstanceName() + "_i.dsp(";
-//            c += "  " + o.GenerateDoFunctionName() + "(this";
-            boolean needsComma = false;
-            for (InletInstance i : o.GetInletInstances()) {
-                if (needsComma) {
-                    c += ", ";
-                }
-                Net n = GetNet(i);
-                if ((n != null) && (n.isValidNet())) {
-                    if (i.GetDataType().equals(n.GetDataType())) {
-                        if (n.NeedsLatch()
-                                && (objectinstances.indexOf(n.source.get(0).axoObj) >= objectinstances.indexOf(o))) {
-                            c += n.CName() + "Latch";
-                        } else {
-                            c += n.CName();
-                        }
-                    } else {
-                        if (n.NeedsLatch()
-                                && (objectinstances.indexOf(n.source.get(0).axoObj) >= objectinstances.indexOf(o))) {
-                            c += n.GetDataType().GenerateConversionToType(i.GetDataType(), n.CName() + "Latch");
-                        } else {
-                            c += n.GetDataType().GenerateConversionToType(i.GetDataType(), n.CName());
-                        }
-                    }
-                } else { // unconnected input
-                    c += i.GetDataType().GenerateSetDefaultValueCode();
-                }
-                needsComma = true;
-            }
-            for (OutletInstance i : o.GetOutletInstances()) {
-                if (needsComma) {
-                    c += ", ";
-                }
-                Net n = GetNet(i);
-                if ((n != null) && n.isValidNet()) {
-                    if (n.IsFirstOutlet(i)) {
-                        c += n.CName();
-                    } else {
-                        c += n.CName() + "+";
-                    }
-                } else {
-                    if (i.GetDataType() instanceof axoloti.datatypes.DataTypeBuffer) {
-                        c += "UNCONNECTED_OUTPUT_BUFFER";
-                    } else {
-                        c += "UNCONNECTED_OUTPUT";
-                    }
-                }
-                needsComma = true;
-            }
-            for (ParameterInstance i : o.getParameterInstances()) {
-                if (i.parameter.PropagateToChild == null) {
-                    if (needsComma) {
-                        c += ", ";
-                    }
-                    c += i.variableName("", false);
-                    needsComma = true;
-                }
-            }
-            for (DisplayInstance i : o.GetDisplayInstances()) {
-                if (i.display.getLength() > 0) {
-                    if (needsComma) {
-                        c += ", ";
-                    }
-                    c += i.valueName("");
-                    needsComma = true;
-                }
-            }
-            c += ");\n";
-//            c += "// --------" + o.getInstanceName() + "---------\n";
-//            c += o.GenerateKRateCode("data->");
-//            c += o.GenerateSRateCode("data->");
+            c += GenerateDSPCodePlusPlusSubObj(o, ClassName, enableOnParent);
         }
         c += "//--------- </object calls> ----------//\n";
 
@@ -1065,8 +1034,88 @@ public void ShowCompileFail() {
         return c;
     }
 
+    String GenerateDSPCodePlusPlusSubObj(AxoObjectInstanceAbstract o, String ClassName, boolean enableOnParent) {
+        String c = "";
+        String s = o.getCInstanceName();
+        if (s.isEmpty()) {
+            return c;
+        }
+        c += "  " + o.getCInstanceName() + "_i.dsp(";
+//            c += "  " + o.GenerateDoFunctionName() + "(this";
+        boolean needsComma = false;
+        for (InletInstance i : o.GetInletInstances()) {
+            if (needsComma) {
+                c += ", ";
+            }
+            Net n = GetNet(i);
+            if ((n != null) && (n.isValidNet())) {
+                if (i.GetDataType().equals(n.GetDataType())) {
+                    if (n.NeedsLatch()
+                            && (objectinstances.indexOf(n.source.get(0).GetObjectInstance()) >= objectinstances.indexOf(o))) {
+                        c += n.CName() + "Latch";
+                    } else {
+                        c += n.CName();
+                    }
+                } else {
+                    if (n.NeedsLatch()
+                            && (objectinstances.indexOf(n.source.get(0).GetObjectInstance()) >= objectinstances.indexOf(o))) {
+                        c += n.GetDataType().GenerateConversionToType(i.GetDataType(), n.CName() + "Latch");
+                    } else {
+                        c += n.GetDataType().GenerateConversionToType(i.GetDataType(), n.CName());
+                    }
+                }
+            } else { // unconnected input
+                c += i.GetDataType().GenerateSetDefaultValueCode();
+            }
+            needsComma = true;
+        }
+        for (OutletInstance i : o.GetOutletInstances()) {
+            if (needsComma) {
+                c += ", ";
+            }
+            Net n = GetNet(i);
+            if ((n != null) && n.isValidNet()) {
+                if (n.IsFirstOutlet(i)) {
+                    c += n.CName();
+                } else {
+                    c += n.CName() + "+";
+                }
+            } else {
+                if (i.GetDataType() instanceof axoloti.datatypes.DataTypeBuffer) {
+                    c += "UNCONNECTED_OUTPUT_BUFFER";
+                } else {
+                    c += "UNCONNECTED_OUTPUT";
+                }
+            }
+            needsComma = true;
+        }
+        for (ParameterInstance i : o.getParameterInstances()) {
+            if (i.parameter.PropagateToChild == null) {
+                if (needsComma) {
+                    c += ", ";
+                }
+                c += i.variableName("", false);
+                needsComma = true;
+            }
+        }
+        for (DisplayInstance i : o.GetDisplayInstances()) {
+            if (i.display.getLength() > 0) {
+                if (needsComma) {
+                    c += ", ";
+                }
+                c += i.valueName("");
+                needsComma = true;
+            }
+        }
+        c += ");\n";
+        return c;
+    }
+
     String GenerateMidiInCodePlusPlus() {
         String c = "";
+        if (controllerinstance != null) {
+            c += controllerinstance.GenerateCallMidiHandler();
+        }
         for (AxoObjectInstanceAbstract o : objectinstances) {
             c += o.GenerateCallMidiHandler();
         }
@@ -1144,10 +1193,9 @@ public void ShowCompileFail() {
                 + "  }\n"
                 + "}\n\n";
 
-
         c += "void xpatch_init2(int fwid)\n"
                 + "{\n"
-                + "  if (fwid != 0x" + MainFrame.mainframe.LinkFirmwareID+ ") {\n"
+                + "  if (fwid != 0x" + MainFrame.mainframe.LinkFirmwareID + ") {\n"
                 + "    patchMeta.fptr_dsp_process = 0;\n"
                 + "    return;"
                 + "  }\n"
@@ -1190,9 +1238,25 @@ public void ShowCompileFail() {
     }
 
     String GenerateCode3() {
+        Preferences prefs = MainFrame.prefs;
+        controllerinstance = null;
+        String cobjstr = prefs.getControllerObject();
+        if (prefs.isControllerEnabled() && cobjstr != null && !cobjstr.isEmpty()) {
+            Logger.getLogger(Patch.class.getName()).log(Level.INFO, "Using controller object: {0}", cobjstr);
+            AxoObjectAbstract x = null;
+            ArrayList<AxoObjectAbstract> objs = MainFrame.axoObjects.GetAxoObjectFromName(cobjstr, GetCurrentWorkingDirectory());
+            if ((objs != null) && (!objs.isEmpty())) {
+                x = objs.get(0);
+            }
+            if (x != null) {
+                controllerinstance = x.CreateInstance(null, "ctrl0x123", new Point(0, 0));
+            } else {
+                Logger.getLogger(Patch.class.getName()).log(Level.INFO, "Unable to created controller for : {0}", cobjstr);
+            }
+        }
+
         CreateIID();
         SortByPosition();
-        String firmwaredir = System.getProperty(Axoloti.FIRMWARE_DIR);
         String c = "extern \"C\" { \n";
         c += generateIncludes();
         c += "}\n"
@@ -1221,6 +1285,7 @@ public void ShowCompileFail() {
                 + "}\n";
 
         c += GenerateStructCodePlusPlus("rootc", false, "rootc")
+                + "static const int polyIndex = 0;\n"
                 + GenerateParamInitCode3("rootc")
                 + GeneratePresetCode3("rootc")
                 + GenerateInitCodePlusPlus("rootc")
@@ -1228,6 +1293,9 @@ public void ShowCompileFail() {
                 + GenerateDSPCodePlusPlus("rootc", false)
                 + GenerateMidiCodePlusPlus("rootc")
                 + GeneratePatchCodePlusPlus("rootc");
+
+        c = c.replace("attr_poly", "1");
+
         if (settings == null) {
             c = c.replace("attr_midichannel", "0");
         } else {
@@ -1248,6 +1316,8 @@ public void ShowCompileFail() {
                 ao.inlets.add(new InletBool32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/inlet a")) {
                 ao.inlets.add(new InletFrac32Buffer(o.getInstanceName(), o.getInstanceName()));
+            } else if (o.typeName.equals("patch/inlet string")) {
+                ao.inlets.add(new InletCharPtr32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/outlet f")) {
                 ao.outlets.add(new OutletFrac32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/outlet i")) {
@@ -1256,6 +1326,8 @@ public void ShowCompileFail() {
                 ao.outlets.add(new OutletBool32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/outlet a")) {
                 ao.outlets.add(new OutletFrac32Buffer(o.getInstanceName(), o.getInstanceName()));
+            } else if (o.typeName.equals("patch/outlet string")) {
+                ao.outlets.add(new OutletCharPtr32(o.getInstanceName(), o.getInstanceName()));
             }
             for (ParameterInstance p : o.getParameterInstances()) {
                 if (p.isOnParent()) {
@@ -1265,9 +1337,11 @@ public void ShowCompileFail() {
         }
         /* object structures */
 //         ao.sCName = fnNoExtension;
-        ao.sLocalData = GenerateStructCodePlusPlusSub("attr_parent", true);
+        ao.sLocalData = GenerateStructCodePlusPlusSub("attr_parent", true)
+                + "static const int polyIndex = 0;\n";
         ao.sLocalData += GenerateParamInitCode3("");
         ao.sLocalData += GeneratePresetCode3("");
+        ao.sLocalData = ao.sLocalData.replaceAll("attr_poly", "1");
         ao.sInitCode = GenerateParamInitCodePlusPlusSub("attr_parent", "this");
         ao.sInitCode += GenerateObjInitCodePlusPlusSub("attr_parent", "this");
         ao.sDisposeCode = GenerateDisposeCodePlusPlusSub("attr_parent");
@@ -1282,14 +1356,19 @@ public void ShowCompileFail() {
         for (AxoObjectInstanceAbstract o : objectinstances) {
             if (o.typeName.equals("patch/inlet f") || o.typeName.equals("patch/inlet i") || o.typeName.equals("patch/inlet b")) {
                 ao.sKRateCode += "   " + o.getCInstanceName() + "_i._inlet = inlet_" + o.getLegalName() + ";\n";
+            } else if (o.typeName.equals("patch/inlet string")) {
+                ao.sKRateCode += "   " + o.getCInstanceName() + "_i._inlet = (const char *)inlet_" + o.getLegalName() + ";\n";
             } else if (o.typeName.equals("patch/inlet a")) {
                 ao.sKRateCode += "   for(i=0;i<BUFSIZE;i++) " + o.getCInstanceName() + "_i._inlet[i] = inlet_" + o.getLegalName() + "[i];\n";
             }
+
         }
         ao.sKRateCode += GenerateDSPCodePlusPlusSub("attr_parent", true);
         for (AxoObjectInstanceAbstract o : objectinstances) {
             if (o.typeName.equals("patch/outlet f") || o.typeName.equals("patch/outlet i") || o.typeName.equals("patch/outlet b")) {
                 ao.sKRateCode += "   outlet_" + o.getLegalName() + " = " + o.getCInstanceName() + "_i._outlet;\n";
+            } else if (o.typeName.equals("patch/outlet string")) {
+                ao.sKRateCode += "   outlet_" + o.getLegalName() + " = (char *)" + o.getCInstanceName() + "_i._outlet;\n";
             } else if (o.typeName.equals("patch/outlet a")) {
                 ao.sKRateCode += "      for(i=0;i<BUFSIZE;i++) outlet_" + o.getLegalName() + "[i] = " + o.getCInstanceName() + "_i._outlet[i];\n";
             }
@@ -1392,6 +1471,8 @@ public void ShowCompileFail() {
                 ao.inlets.add(new InletBool32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/inlet a")) {
                 ao.inlets.add(new InletFrac32Buffer(o.getInstanceName(), o.getInstanceName()));
+            } else if (o.typeName.equals("patch/inlet string")) {
+                ao.inlets.add(new InletCharPtr32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/outlet f")) {
                 ao.outlets.add(new OutletFrac32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/outlet i")) {
@@ -1400,6 +1481,8 @@ public void ShowCompileFail() {
                 ao.outlets.add(new OutletBool32(o.getInstanceName(), o.getInstanceName()));
             } else if (o.typeName.equals("patch/outlet a")) {
                 ao.outlets.add(new OutletFrac32Buffer(o.getInstanceName(), o.getInstanceName()));
+            } else if (o.typeName.equals("patch/outlet string")) {
+                ao.outlets.add(new OutletCharPtr32(o.getInstanceName(), o.getInstanceName()));
             }
             for (ParameterInstance p : o.getParameterInstances()) {
                 if (p.isOnParent()) {
@@ -1413,7 +1496,7 @@ public void ShowCompileFail() {
         ao.sLocalData += "/* parameter instance indices */\n";
         int k = 0;
         for (ParameterInstance p : ParameterInstances) {
-            ao.sLocalData += "static const int PARAM_INDEX_" + p.axoObj.getLegalName() + "_" + p.getLegalName() + " = " + k + ";\n";
+            ao.sLocalData += "static const int PARAM_INDEX_" + p.GetObjectInstance().getLegalName() + "_" + p.getLegalName() + " = " + k + ";\n";
             k++;
         }
 
@@ -1421,7 +1504,7 @@ public void ShowCompileFail() {
         ao.sLocalData += "class voice {\n";
         ao.sLocalData += "   public:\n";
         ao.sLocalData += "   int polyIndex;\n";
-        ao.sLocalData += GeneratePexchAndDisplayCode();
+        ao.sLocalData += GeneratePexchAndDisplayCodeV();
         ao.sLocalData += GenerateObjectCode("voice", true, "parent->common->");
         ao.sLocalData += "attr_parent *common;\n";
         ao.sLocalData += "void Init(voice *parent) {\n";
@@ -1458,6 +1541,10 @@ public void ShowCompileFail() {
         ao.sLocalData += "int32_t priority;\n";
         ao.sLocalData += "int32_t sustain;\n";
         ao.sLocalData += "int8_t pressed[attr_poly];\n";
+
+        ao.sLocalData = ao.sLocalData.replaceAll("parent->PExModulationSources", "parent->common->PExModulationSources");
+        ao.sLocalData = ao.sLocalData.replaceAll("parent->PExModulationPrevVal", "parent->common->PExModulationPrevVal");
+
         ao.sInitCode = GenerateParamInitCodePlusPlusSub("", "parent");
         ao.sInitCode += "int k;\n"
                 + "   for(k=0;k<NPEXCH;k++){\n"
@@ -1491,7 +1578,8 @@ public void ShowCompileFail() {
                 + "}\n";
         ao.sKRateCode = "";
         for (AxoObjectInstanceAbstract o : objectinstances) {
-            if (o.typeName.equals("patch/outlet f") || o.typeName.equals("patch/outlet i") || o.typeName.equals("patch/outlet b")) {
+            if (o.typeName.equals("patch/outlet f") || o.typeName.equals("patch/outlet i")
+                    || o.typeName.equals("patch/outlet b") || o.typeName.equals("patch/outlet string")) {
                 ao.sKRateCode += "   outlet_" + o.getLegalName() + " = 0;\n";
             } else if (o.typeName.equals("patch/outlet a")) {
                 ao.sKRateCode += "{\n"
@@ -1503,9 +1591,11 @@ public void ShowCompileFail() {
         ao.sKRateCode += "int vi; for(vi=0;vi<attr_poly;vi++) {";
 
         for (AxoObjectInstanceAbstract o : objectinstances) {
-            if (o.typeName.equals("inlet") || o.typeName.equals("inlet_i") || o.typeName.equals("inlet_b")
+            if (o.typeName.equals("inlet") || o.typeName.equals("inlet_i") || o.typeName.equals("inlet_b") || o.typeName.equals("inlet_")
                     || o.typeName.equals("patch/inlet f") || o.typeName.equals("patch/inlet i") || o.typeName.equals("patch/inlet b")) {
                 ao.sKRateCode += "   getVoices()[vi]." + o.getCInstanceName() + "_i._inlet = inlet_" + o.getLegalName() + ";\n";
+            } else if (o.typeName.equals("inlet_string") || o.typeName.equals("patch/inlet string")) {
+                ao.sKRateCode += "   getVoices()[vi]." + o.getCInstanceName() + "_i._inlet = (const char *)inlet_" + o.getLegalName() + ";\n";
             } else if (o.typeName.equals("inlet~") || o.typeName.equals("patch/inlet a")) {
                 ao.sKRateCode += "{int j; for(j=0;j<BUFSIZE;j++) getVoices()[vi]." + o.getCInstanceName() + "_i._inlet[j] = inlet_" + o.getLegalName() + "[j];}\n";
             }
@@ -1516,6 +1606,8 @@ public void ShowCompileFail() {
                     || o.typeName.equals("patch/outlet i")
                     || o.typeName.equals("patch/outlet b")) {
                 ao.sKRateCode += "   outlet_" + o.getLegalName() + " += getVoices()[vi]." + o.getCInstanceName() + "_i._outlet;\n";
+            } else if (o.typeName.equals("patch/outlet string")) {
+                ao.sKRateCode += "   outlet_" + o.getLegalName() + " = (char *)getVoices()[vi]." + o.getCInstanceName() + "_i._outlet;\n";
             } else if (o.typeName.equals("patch/outlet a")) {
                 ao.sKRateCode += "{\n"
                         + "      int j;\n"
@@ -2013,11 +2105,11 @@ public void ShowCompileFail() {
         // TODO: copy attributes tooo!
         Map<String, ParameterInstance> params = new TreeMap<String, ParameterInstance>();
         for (ParameterInstance p : obj.getParameterInstances()) {
-            params.put(p.name, p);
+            params.put(p.getName(), p);
         }
         Map<String, AttributeInstance> attrs = new TreeMap<String, AttributeInstance>();
         for (AttributeInstance a : obj.getAttributeInstances()) {
-            attrs.put(a.attributeName, a);
+            attrs.put(a.getName(), a);
         }
         Map<String, InletInstance> inlets = new TreeMap<String, InletInstance>();
         for (InletInstance il : obj.GetInletInstances()) {
@@ -2053,13 +2145,13 @@ public void ShowCompileFail() {
         AxoObjectInstanceAbstract newObj = AddObjectInstance(objType, obj.getLocation());
 
         for (ParameterInstance p : newObj.getParameterInstances()) {
-            ParameterInstance p1 = params.get(p.name);
+            ParameterInstance p1 = params.get(p.getName());
             if (p1 != null) {
                 p.CopyValueFrom(p1);
             }
         }
         for (AttributeInstance a : newObj.getAttributeInstances()) {
-            AttributeInstance a1 = attrs.get(a.attributeName);
+            AttributeInstance a1 = attrs.get(a.getName());
             if (a1 != null) {
                 a.CopyValueFrom(a1);
             }
@@ -2174,5 +2266,9 @@ public void ShowCompileFail() {
 
     public Rectangle getWindowPos() {
         return windowPos;
+    }
+
+    public PatchFrame getPatchframe() {
+        return patchframe;
     }
 }

@@ -19,11 +19,12 @@ package generatedobjects;
 
 import axoloti.attributedefinition.AxoAttributeComboBox;
 import axoloti.attributedefinition.AxoAttributeObjRef;
+import axoloti.attributedefinition.AxoAttributeTablename;
 import axoloti.attributedefinition.AxoAttributeTextEditor;
 import axoloti.inlets.InletBool32Rising;
-import axoloti.inlets.InletBool32RisingFalling;
 import axoloti.inlets.InletCharPtr32;
 import axoloti.inlets.InletFrac32;
+import axoloti.inlets.InletFrac32Bipolar;
 import axoloti.inlets.InletFrac32Buffer;
 import axoloti.inlets.InletFrac32BufferPos;
 import axoloti.inlets.InletFrac32Pos;
@@ -32,7 +33,9 @@ import axoloti.object.AxoObject;
 import axoloti.outlets.OutletFrac32;
 import axoloti.outlets.OutletFrac32Buffer;
 import axoloti.outlets.OutletInt32;
+import axoloti.parameters.ParameterFrac32SMapPitch;
 import axoloti.parameters.ParameterFrac32SMapVSlider;
+import axoloti.parameters.ParameterInt32Box;
 import static generatedobjects.gentools.WriteAxoObject;
 
 /**
@@ -50,6 +53,8 @@ public class Table extends gentools {
         WriteAxoObject(catName, CreateSdRamTable8());
         WriteAxoObject(catName, CreateSdRamTable16());
         WriteAxoObject(catName, CreateSdRamTable32());
+        
+        WriteAxoObject(catName, CreateSdRamTable16Load());
 
         WriteAxoObject(catName, CreateRamTable32Slider16());
         WriteAxoObject(catName, new AxoObject[]{CreateTableReadI(), CreateTableRead(), CreateTableReadTilde()});
@@ -57,6 +62,8 @@ public class Table extends gentools {
         WriteAxoObject(catName, new AxoObject[]{CreateTableWrite(), CreateTableWriteI()});
         WriteAxoObject(catName, CreateTableRecord());
         WriteAxoObject(catName, CreateTablePlay());
+        WriteAxoObject(catName, CreateTablePlayPitch());
+        WriteAxoObject(catName, CreateTablePlayPitchLoop());
         WriteAxoObject(catName, SaveTable());
         WriteAxoObject(catName, LoadTable());
     }
@@ -128,9 +135,9 @@ public class Table extends gentools {
         AxoObject o = new AxoObject("alloc 8b sdram", "allocate table in SDRAM memory, -128..127");
         String mentries[] = {"2", "4", "8", "16", "32", "64", "128", "256", "512",
             "1024", "2048", "4096", "8192", "16384", "32768",
-            "65536", "131072", "262144", "524288", "1048576", "2097152"};
+            "65536", "131072", "262144", "524288", "1048576", "2097152","4194304"};
         String centries[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-            "16", "17", "18", "19", "20", "21"};
+            "16", "17", "18", "19", "20", "21", "22"};
         o.attributes.add(new AxoAttributeComboBox("size", mentries, centries));
         o.attributes.add(new AxoAttributeTextEditor("init"));
         o.sLocalData = "static const uint32_t LENGTHPOW = (%size%);\n"
@@ -139,8 +146,8 @@ public class Table extends gentools {
                 + "static const uint32_t BITS = 8;\n"
                 + "static const uint32_t GAIN = 20;\n"
                 + "int8_t *array;\n";
-        o.sInitCode = "static int8_t _array[LENGTH] __attribute__ ((section (\".sdram\")));\n"
-                + "array = _array;\n"
+        o.sInitCode = "static int8_t _array[attr_poly][LENGTH] __attribute__ ((section (\".sdram\")));\n"
+                + "array = &_array[parent->polyIndex][0];\n"
                 + "{ \n"
                 + "  int i;\n"
                 + "  for(i=0;i<LENGTH;i++) array[i]=0;\n"
@@ -153,9 +160,9 @@ public class Table extends gentools {
         AxoObject o = new AxoObject("alloc 16b sdram", "allocate 16bit table in SDRAM memory, -128.00 .. 127.99");
         String mentries[] = {"2", "4", "8", "16", "32", "64", "128", "256", "512",
             "1024", "2048", "4096", "8192", "16384", "32768",
-            "65536", "131072", "262144", "524288", "1048576", "2097152"};
+            "65536", "131072", "262144", "524288", "1048576", "2097152", "4194304"};
         String centries[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-            "16", "17", "18", "19", "20", "21"};
+            "16", "17", "18", "19", "20", "21", "22"};
         o.attributes.add(new AxoAttributeComboBox("size", mentries, centries));
         o.attributes.add(new AxoAttributeTextEditor("init"));
         o.sLocalData = "static const uint32_t LENGTHPOW = (%size%);\n"
@@ -164,13 +171,58 @@ public class Table extends gentools {
                 + "static const uint32_t BITS = 16;\n"
                 + "static const uint32_t GAIN = 12;\n"
                 + "int16_t *array;\n";
-        o.sInitCode = "static int16_t _array[LENGTH] __attribute__ ((section (\".sdram\")));\n"
-                + "array = _array;\n"
+        o.sInitCode = "static int16_t _array[attr_poly][LENGTH] __attribute__ ((section (\".sdram\")));\n"
+                + "array = &_array[parent->polyIndex][0];\n"
                 + "{ \n"
                 + "  int i;\n"
                 + "  for(i=0;i<LENGTH;i++) array[i]=0;\n"
                 + "}\n"
                 + "%init%";
+        return o;
+    }
+
+    static AxoObject CreateSdRamTable16Load() {
+        AxoObject o = new AxoObject("alloc 16b sdram load", "allocate 16bit table in SDRAM memory, -128.00 .. 127.99");
+        String mentries[] = {"2", "4", "8", "16", "32", "64", "128", "256", "512",
+            "1024", "2048", "4096", "8192", "16384", "32768",
+            "65536", "131072", "262144", "524288", "1048576", "2097152", "4194304"};
+        String centries[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+            "16", "17", "18", "19", "20", "21", "22"};
+        o.attributes.add(new AxoAttributeComboBox("size", mentries, centries));
+        o.attributes.add(new AxoAttributeTablename("filename"));
+        o.sLocalData = "static const uint32_t LENGTHPOW = (%size%);\n"
+                + "static const uint32_t LENGTH = (1<<%size%);\n"
+                + "static const uint32_t LENGTHMASK = ((1<<%size%)-1);\n"
+                + "static const uint32_t BITS = 16;\n"
+                + "static const uint32_t GAIN = 12;\n"
+                + "int16_t *array;\n";
+        o.sInitCode = "static int16_t _array[attr_poly][LENGTH] __attribute__ ((section (\".sdram\")));\n"
+                + "array = &_array[parent->polyIndex][0];\n"
+                + "int i;\n"
+                + "for(i=0;i<LENGTH;i++) array[i]=0;\n"
+                + "FIL FileObject;\n"
+                + "FRESULT err;\n"
+                + "UINT bytes_read;\n"
+                + "err = f_open(&FileObject, \"%filename%\", FA_READ | FA_OPEN_EXISTING);\n"
+                + "if (err != FR_OK) {report_fatfs_error(err,\"%filename%\"); return;}\n"
+                + "int rem_sz = sizeof(_array[0]);\n"
+                + "int offset = 0;\n"
+                + "while (rem_sz>0) {\n"
+                + "  if (rem_sz>sizeof(fbuff)) {\n"
+                + "    err = f_read(&FileObject, fbuff, sizeof(fbuff),&bytes_read);\n"
+                + "    if (bytes_read == 0) break;\n"
+                + "    memcpy((char *)(&_array[0]) + offset,(char *)fbuff,bytes_read);\n"
+                + "    rem_sz -= bytes_read;\n"
+                + "    offset += bytes_read;\n"
+                + "  } else {\n"
+                + "    err = f_read(&FileObject, fbuff, rem_sz, &bytes_read);\n"
+                + "    memcpy((char *)(&_array[0]) + offset,(char *)fbuff,bytes_read);\n"
+                + "    rem_sz = 0;\n"
+                + "  }\n"
+                + "}"
+                + "if (err != FR_OK) {LogTextMessage(\"Read failed\\n\"); return;}\n"
+                + "err = f_close(&FileObject);\n"
+                + "if (err != FR_OK) {LogTextMessage(\"Close failed\\n\"); return;}\n";
         return o;
     }
 
@@ -189,8 +241,8 @@ public class Table extends gentools {
                 + "static const uint32_t BITS = 32;\n"
                 + "static const uint32_t GAIN = 0;\n"
                 + "int32_t *array;\n";
-        o.sInitCode = "static int32_t _array[LENGTH] __attribute__ ((section (\".sdram\")));\n"
-                + "array = _array;\n"
+        o.sInitCode = "static int32_t _array[attr_poly][LENGTH] __attribute__ ((section (\".sdram\")));\n"
+                + "array = &_array[parent->polyIndex][0];\n"
                 + "{ \n"
                 + "  int i;\n"
                 + "  for(i=0;i<LENGTH;i++) array[i]=0;\n"
@@ -292,6 +344,7 @@ public class Table extends gentools {
         o.inlets.add(new InletBool32Rising("trig", "trigger"));
         o.attributes.add(new AxoAttributeObjRef("table"));
         o.sLocalData = "   int ntrig;\n";
+        o.sInitCode =  "   int ntrig = 0;\n";
         o.sKRateCode = "   if ((%trig%>0) && !ntrig) {\n"
                 + "      ntrig=1;\n"
                 + "      %table%.array[__USAT(%a%,27)>>(27-%table%.LENGTHPOW)]=__SSAT(%v%,28)>>%table%.GAIN;\n"
@@ -307,6 +360,7 @@ public class Table extends gentools {
         o.inlets.add(new InletBool32Rising("trig", "trigger"));
         o.attributes.add(new AxoAttributeObjRef("table"));
         o.sLocalData = "   int ntrig;\n";
+        o.sInitCode =  "   int ntrig = 0;\n";
         o.sKRateCode = "   if ((%trig%>0) && !ntrig) {\n"
                 + "      ntrig=1;\n"
                 + "      if (%a%<%table%.LENGTH)\n"
@@ -315,8 +369,6 @@ public class Table extends gentools {
                 + "   if (!(%trig%>0)) ntrig=0;\n";
         return o;
     }
-
-
 
     static AxoObject CreateTableRecord() {
         AxoObject o = new AxoObject("record", "record audio into table, starting from position");
@@ -331,7 +383,7 @@ public class Table extends gentools {
         o.sInitCode = "pos = 0;\n"
                 + "pstart = 0;\n"
                 + "pstop = 1;\n";
-       o.sKRateCode = "   if ((%start%>0) && !pstart) {\n"
+        o.sKRateCode = "   if ((%start%>0) && !pstart) {\n"
                 + "      pstart = 1;\n"
                 + "      pstop = 0;\n"
                 + "      uint32_t asat = __USAT(%pos%,27);\n"
@@ -384,6 +436,90 @@ public class Table extends gentools {
         return o;
     }
 
+    static AxoObject CreateTablePlayPitch() {
+        AxoObject o = new AxoObject("play pitch", "play audio sample from table with pitch control, starting from position");
+        o.params.add(new ParameterFrac32SMapPitch("pitch"));
+        o.outlets.add(new OutletFrac32Buffer("wave", "wave"));
+        o.inlets.add(new InletBool32Rising("start", "start playback"));
+        o.inlets.add(new InletBool32Rising("stop", "stop playback"));
+        o.inlets.add(new InletFrac32Bipolar("pitch", "pitch modulation"));
+        o.inlets.add(new InletFrac32Pos("pos", "start position in table"));
+        o.attributes.add(new AxoAttributeObjRef("table"));
+        o.sLocalData = "   int pstart;\n"
+                + "   int pstop;\n"
+                + "   uint64_t pos;\n";
+        o.sInitCode = "pos = 0;\n"
+                + "pstart = 0;\n"
+                + "pstop = 1;\n";
+        o.sKRateCode = "   if ((inlet_start>0) && !pstart) {\n"
+                + "      pstart = 1;\n"
+                + "      pstop = 0;\n"
+                + "      uint32_t asat = __USAT(inlet_pos,27);\n"
+                + "      pos = ((uint64_t)(asat>>(27-attr_table.LENGTHPOW)))<<32;\n"
+                + "   } else if (!(inlet_start>0)) {\n"
+                + "      pstart = 0;\n"
+                + "   }\n"
+                + "   if ((inlet_stop>0) && !pstop) {\n"
+                + "      pstop = 1;\n"
+                + "      pstart = 0;\n"
+                + "   }\n"
+                + "   uint32_t f0;\n"
+                + "   MTOFEXTENDED(inlet_pitch + 80179668 - param_pitch,f0);\n";
+        o.sSRateCode = "   if (!pstop) {\n"
+                + "      if ((pos>>32)<attr_table.LENGTH) {\n"
+                + "         uint32_t r = ___SMMUL(attr_table.array[pos>>32]<<attr_table.GAIN,INT32_MAX-(((uint32_t)pos)>>1));\n"
+                + "         r = ___SMMLA(attr_table.array[(pos>>32)+1]<<attr_table.GAIN,(((uint32_t)pos)>>1),r);\n"
+                + "         outlet_wave = r;\n"
+                + "         pos += ((uint64_t)f0)<<4;\n"
+                + "      }\n"
+                + "      else outlet_wave = 0;\n"
+                + "   } else outlet_wave = 0;\n";
+        return o;
+    }
+
+    static AxoObject CreateTablePlayPitchLoop() {
+        AxoObject o = new AxoObject("play pitch loop", "play audio sample from table with pitch control, starting from position");
+        o.params.add(new ParameterFrac32SMapPitch("pitch"));
+        o.params.add(new ParameterInt32Box("loopstart", 0, 1 << 30));
+        o.params.add(new ParameterInt32Box("loopend", 0, 1 << 30));
+        o.outlets.add(new OutletFrac32Buffer("wave", "wave"));
+        o.inlets.add(new InletBool32Rising("start", "start playback"));
+        o.inlets.add(new InletBool32Rising("stop", "stop playback"));
+        o.inlets.add(new InletFrac32Bipolar("pitch", "pitch modulation"));
+        o.inlets.add(new InletFrac32Pos("pos", "start position in table"));
+        o.attributes.add(new AxoAttributeObjRef("table"));
+        o.sLocalData = "   int pstart;\n"
+                + "   int pstop;\n"
+                + "   uint64_t pos;\n";
+        o.sInitCode = "pos = 0;\n"
+                + "pstart = 0;\n"
+                + "pstop = 1;\n";
+        o.sKRateCode = "   if ((inlet_start>0) && !pstart) {\n"
+                + "      pstart = 1;\n"
+                + "      pstop = 0;\n"
+                + "      uint32_t asat = __USAT(inlet_pos,27);\n"
+                + "      pos = ((uint64_t)(asat>>(27-attr_table.LENGTHPOW)))<<32;\n"
+                + "   } else if (!(inlet_start>0)) {\n"
+                + "      pstart = 0;\n"
+                + "   }\n"
+                + "   if ((inlet_stop>0) && !pstop) {\n"
+                + "      pstop = 1;\n"
+                + "      pstart = 0;\n"
+                + "   }\n"
+                + "   uint32_t f0;\n"
+                + "   MTOFEXTENDED(param_pitch + inlet_pitch,f0);\n";
+        o.sSRateCode = "   if (!pstop) {\n"
+                + "      if ((pos>>32)<attr_table.LENGTH) {\n"
+                + "         uint32_t r = ___SMMUL(attr_table.array[pos>>32]<<attr_table.GAIN,INT32_MAX-(((uint32_t)pos)>>1));\n"
+                + "         r = ___SMMLA(attr_table.array[(pos>>32)+1]<<attr_table.GAIN,(((uint32_t)pos)>>1),r);\n"
+                + "         outlet_wave = r;\n"
+                + "         pos += ((uint64_t)f0)<<4;\n"
+                + "      }\n"
+                + "      else outlet_wave = 0;\n"
+                + "   } else outlet_wave = 0;\n";
+        return o;
+    }
+
     static AxoObject SaveTable() {
         AxoObject o = new AxoObject("save", "save table to sdcard");
         o.attributes.add(new AxoAttributeObjRef("table"));
@@ -398,7 +534,7 @@ public class Table extends gentools {
                 + "    FRESULT err;\n"
                 + "    UINT bytes_written;\n"
                 + "    err = f_open(&FileObject, %filename%, FA_WRITE | FA_CREATE_ALWAYS);\n"
-                + "    if (err != FR_OK) LogTextMessage(\"Open failed\\n\");\n"
+                + "    if (err != FR_OK) {report_fatfs_error(err,\"%filename%\"); return;}\n"
                 + "    int rem_sz = sizeof(*%table%.array)*%table%.LENGTH;\n"
                 + "    int offset = 0;\n"
                 + "    while (rem_sz>0) {\n"
@@ -413,9 +549,9 @@ public class Table extends gentools {
                 + "        rem_sz = 0;\n"
                 + "      }\n"
                 + "    }"
-                + "    if (err != FR_OK) LogTextMessage(\"Write failed\\n\");\n"
+                + "    if (err != FR_OK) report_fatfs_error(err,\"%filename%\");\n"
                 + "    err = f_close(&FileObject);\n"
-                + "    if (err != FR_OK) LogTextMessage(\"Close failed\\n\");\n"
+                + "    if (err != FR_OK) report_fatfs_error(err,\"%filename%\");\n"
                 + "  }\n"
                 + "  else if (!(%trig%>0)) ntrig=0;\n";
         return o;
@@ -426,19 +562,16 @@ public class Table extends gentools {
         o.attributes.add(new AxoAttributeObjRef("table"));
         o.inlets.add(new InletCharPtr32("filename", "file name"));
         o.inlets.add(new InletBool32Rising("trig", "trigger"));
-        o.outlets.add(new OutletInt32("bw", "bw"));
         o.includes.add("chibios/ext/fatfs/src/ff.h");
-        o.sLocalData = "  int ntrig;\n"
-                + "   int _bw;\n";
-        o.sInitCode = "  ntrig = 0;\n"
-                + "_bw = 0;\n";
+        o.sLocalData = "  int ntrig;\n";
+        o.sInitCode = "  ntrig = 0;\n";
         o.sKRateCode = "  if ((%trig%>0) && !ntrig) {\n"
                 + "    ntrig=1;\n"
                 + "    FIL FileObject;\n"
                 + "    FRESULT err;\n"
                 + "    UINT bytes_read;\n"
                 + "    err = f_open(&FileObject, %filename%, FA_READ | FA_OPEN_EXISTING);\n"
-                + "    if (err != FR_OK) {LogTextMessage(\"Open failed\\n\"); _bw = err; return;}\n"
+                + "    if (err != FR_OK) { report_fatfs_error(err,\"%filename%\"); return;}\n"
                 + "    int rem_sz = sizeof(*%table%.array)*%table%.LENGTH;\n"
                 + "    int offset = 0;\n"
                 + "    while (rem_sz>0) {\n"
@@ -454,12 +587,11 @@ public class Table extends gentools {
                 + "        rem_sz = 0;\n"
                 + "      }\n"
                 + "    }"
-                + "    if (err != FR_OK) {LogTextMessage(\"Read failed\\n\"); _bw = err; return;};\n"
+                + "    if (err != FR_OK) { report_fatfs_error(err,\"%filename%\"); return;};\n"
                 + "    err = f_close(&FileObject);\n"
-                + "    if (err != FR_OK) {LogTextMessage(\"Close failed\\n\");_bw = err; return;};\n"
+                + "    if (err != FR_OK) { report_fatfs_error(err,\"%filename%\"); return;};\n"
                 + "  }\n"
-                + "  else if (!(%trig%>0)) ntrig=0;\n"
-                + "%bw% = _bw;\n";
+                + "  else if (!(%trig%>0)) ntrig=0;\n";
         return o;
     }
 

@@ -55,28 +55,23 @@ import qcmds.QCmdWriteMem;
 public class USBBulkConnection extends Connection {
 
     private Patch patch;
-    boolean disconnectRequested;
-    boolean connected;
-    Thread transmitterThread;
-    Thread receiverThread;
-    BlockingQueue<QCmdSerialTask> queueSerialTask;
-    private final BlockingQueue<QCmd> queueResponse;
-    String cpuid;
+    private boolean disconnectRequested;
+    private boolean connected;
+    private Thread transmitterThread;
+    private Thread receiverThread;
+    private final BlockingQueue<QCmdSerialTask> queueSerialTask;
+    private String cpuid;
     private axoloti_core targetProfile;
     private final Context context;
     private DeviceHandle handle;
-    private Device device;
-    private String devicePath;
-
     private final short bulkVID = (short) 0x16C0;
     private final short bulkPID = (short) 0x0442;
     private final int interfaceNumber = 2;
 
-    public USBBulkConnection(Patch patch, BlockingQueue<QCmd> queueResponse) {
+    protected USBBulkConnection() {
         this.sync = new Sync();
         this.readsync = new Sync();
-        this.patch = patch;
-        this.queueResponse = queueResponse;
+        this.patch = null;
         disconnectRequested = false;
         connected = false;
         queueSerialTask = new ArrayBlockingQueue<QCmdSerialTask>(10);
@@ -112,7 +107,7 @@ public class USBBulkConnection extends Connection {
         if (connected) {
             disconnectRequested = true;
             connected = false;
-            MainFrame.mainframe.ShowDisconnect();
+            ShowDisconnect();
             queueSerialTask.clear();
             try {
                 Thread.sleep(100);
@@ -149,7 +144,6 @@ public class USBBulkConnection extends Connection {
             }
 
             LibUsb.close(handle);
-            devicePath = null;
             handle = null;
             CpuId0 = 0;
             CpuId1 = 0;
@@ -379,12 +373,12 @@ public class USBBulkConnection extends Connection {
                 System.out.println("</signature>");
 
             }
-            MainFrame.mainframe.ShowConnect();
+            ShowConnect();
             return true;
 
         } catch (Exception ex) {
             Logger.getLogger(USBBulkConnection.class.getName()).log(Level.SEVERE, null, ex);
-            MainFrame.mainframe.ShowDisconnect();
+            ShowDisconnect();
             return false;
         }
     }
@@ -434,15 +428,17 @@ public class USBBulkConnection extends Connection {
 
     @Override
     public void SendMidi(int m0, int m1, int m2) {
-        byte[] data = new byte[7];
-        data[0] = 'A';
-        data[1] = 'x';
-        data[2] = 'o';
-        data[3] = 'M';
-        data[4] = (byte) m0;
-        data[5] = (byte) m1;
-        data[6] = (byte) m2;
-        writeBytes(data);
+        if (isConnected()) {
+            byte[] data = new byte[7];
+            data[0] = 'A';
+            data[1] = 'x';
+            data[2] = 'o';
+            data[3] = 'M';
+            data[4] = (byte) m0;
+            data[5] = (byte) m1;
+            data[6] = (byte) m2;
+            writeBytes(data);
+        }
     }
 
     @Override
@@ -467,11 +463,20 @@ public class USBBulkConnection extends Connection {
         spsDlg.setVisible(true);
         cpuid = spsDlg.getCPUID();
         String name = MainFrame.prefs.getBoardName(cpuid);
-        if(name==null) {
+        if (name == null) {
             Logger.getLogger(USBBulkConnection.class.getName()).log(Level.INFO, "port: {0}", cpuid);
         } else {
             Logger.getLogger(USBBulkConnection.class.getName()).log(Level.INFO, "port: {0} name: {1}", new Object[]{cpuid, name});
         }
+    }
+
+    static private USBBulkConnection conn = null;
+
+    public static Connection GetConnection() {
+        if (conn == null) {
+            conn = new USBBulkConnection();
+        }
+        return conn;
     }
 
     class Sync {
@@ -489,18 +494,23 @@ public class USBBulkConnection extends Connection {
     }
 
     @Override
-    public boolean WaitSync() {
+    public boolean WaitSync(int msec) {
         synchronized (sync) {
             if (sync.Acked) {
                 return sync.Acked;
             }
             try {
-                sync.wait(1000);
+                sync.wait(msec);
             } catch (InterruptedException ex) {
                 //              Logger.getLogger(SerialConnection.class.getName()).log(Level.SEVERE, "Sync wait interrupted");
             }
             return sync.Acked;
         }
+    }
+
+    @Override
+    public boolean WaitSync() {
+        return WaitSync(1000);
     }
 
     @Override
@@ -726,7 +736,7 @@ public class USBBulkConnection extends Connection {
                     QCmdSerialTask cmd = queueSerialTask.take();
                     QCmd response = cmd.Do(USBBulkConnection.this);
                     if (response != null) {
-                        queueResponse.add(response);
+                        QCmdProcessor.getQCmdProcessor().getQueueResponse().add(response);
                     }
                 } catch (InterruptedException ex) {
                     Logger.getLogger(USBBulkConnection.class.getName()).log(Level.SEVERE, null, ex);
@@ -789,9 +799,10 @@ public class USBBulkConnection extends Connection {
                             .getName()).log(Level.INFO, "Rx paramchange IID mismatch{0} {1}", new Object[]{index, value});
                     return;
                 }
-
+                if (!pi.GetNeedsTransmit()) {
+                    pi.SetValueRaw(value);
+                }
 //                System.out.println("rcv ppc objname:" + pi.axoObj.getInstanceName() + " pname:"+ pi.name);
-                pi.SetValueRaw(value);
             }
         });
 
@@ -1236,7 +1247,7 @@ public class USBBulkConnection extends Connection {
                         break;
                     case 11:
                         patchentrypoint += (cc & 0xFF);
-                        String sFwcrc = String.format("%08X",fwcrc);
+                        String sFwcrc = String.format("%08X", fwcrc);
                         Logger.getLogger(USBBulkConnection.class.getName()).info(String.format("Firmware version: %d.%d.%d.%d, crc=0x%s, entrypoint=0x%08X",
                                 fwversion[0], fwversion[1], fwversion[2], fwversion[3], sFwcrc, patchentrypoint));
                         MainFrame.mainframe.setFirmwareID(sFwcrc);
