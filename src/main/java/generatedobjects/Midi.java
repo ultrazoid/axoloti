@@ -49,6 +49,8 @@ public class Midi extends gentools {
         WriteAxoObject(catName, Create_ctlin_any());
         WriteAxoObject(catName, Create_ctlini_any());
         WriteAxoObject(catName, Create_ctlin3i());
+        WriteAxoObject(catName, Create_ctlin4i());
+        WriteAxoObject(catName, Create_ctlin4ii());
         WriteAxoObject(catName, Create_keyb());
         WriteAxoObject(catName, Create_keyb_mod());
         WriteAxoObject(catName, Create_keyb_touch());
@@ -57,6 +59,7 @@ public class Midi extends gentools {
         WriteAxoObject(catName, Create_keybzoneLRU());
         WriteAxoObject(catName, Create_keybnote());
         WriteAxoObject(catName, Create_bendin());
+        WriteAxoObject(catName, Create_bendin2());
         WriteAxoObject(catName, Create_bendin_ch());
         WriteAxoObject(catName, Create_touchin());
         WriteAxoObject(catName, Create_midiscript());
@@ -69,6 +72,7 @@ public class Midi extends gentools {
         WriteAxoObject(catName, Create_ctloutauto());
         WriteAxoObject(catName, Create_ctlout_any());
         WriteAxoObject(catName, Create_bendout());
+        WriteAxoObject(catName, Create_pgmout());
         WriteAxoObject(catName, Create_clockgen());
         WriteAxoObject(catName, Create_queuestate());
 
@@ -236,6 +240,55 @@ public class Midi extends gentools {
         return o;
     }
 
+    static AxoObject Create_ctlin4i() {
+        AxoObject o = new AxoObject("cc hr i", "Receives Midi Continuous Controller messages, 14 bit, float output");
+        o.sAuthor = "Mark Harris";
+        o.outlets.add(new OutletFrac32Pos("midiCC", "midi CC 0.0-64.0"));
+        o.outlets.add(new OutletBool32Pulse("trig", "trigger output"));
+        o.attributes.add(new AxoAttributeSpinner("cc", 0, 127, 0));
+        o.attributes.add(new AxoAttributeSpinner("default", 0, 127, 0));
+        o.sLocalData = "uint32_t ccl;\n"
+                + "uint32_t _ccv;\n"
+                + "uint8_t ntrig;\n";
+        o.sInitCode = "_ccv = %default%;ccl=0;ntrig=0;\n";
+        o.sMidiCode = "if ((status == %midichannel% + MIDI_CONTROL_CHANGE) && (data1 == %cc%)) {\n"
+                + "  _ccv = (data2 << 20) + ccl ;\n"
+                + "  ntrig = 1;\n"
+                + "} else if ((status == %midichannel% + MIDI_CONTROL_CHANGE) && (data1 == (%cc%+32))) {\n"
+                + "   ccl = data2 << 13;\n"
+                + "}\n";
+        o.sKRateCode
+                = " %midiCC%= _ccv;\n"
+                + "%trig% = ntrig;\n"
+                + "ntrig = 0;\n";
+        return o;
+    }
+
+    static AxoObject Create_ctlin4ii() {
+        AxoObject o = new AxoObject("cc hr ii", "Receives Midi Continuous Controller messages, 14 bit, float output");
+        o.sAuthor = "Mark Harris";
+        o.outlets.add(new OutletFrac32Pos("midiCC", "midi CC 0.0-64.0"));
+        o.outlets.add(new OutletBool32Pulse("trig", "trigger output"));
+        o.attributes.add(new AxoAttributeSpinner("cc", 0, 127, 0));
+        o.attributes.add(new AxoAttributeSpinner("ccl", 0, 127, 32));
+        o.attributes.add(new AxoAttributeSpinner("default", 0, 127, 0));
+        o.sLocalData = "uint32_t ccl;\n"
+                + "uint32_t _ccv;\n"
+                + "uint8_t ntrig;\n";
+        o.sInitCode = "_ccv = %default%;ccl=0;ntrig=0;\n";
+        o.sMidiCode = "if ((status == %midichannel% + MIDI_CONTROL_CHANGE) && (data1 == %cc%)) {\n"
+                + "  _ccv = (data2 << 20) + ccl ;\n"
+                + "  ntrig = 1;\n"
+                + "} else if ((status == %midichannel% + MIDI_CONTROL_CHANGE) && (data1 == (%ccl%))) {\n"
+                + "   ccl = data2 << 13;\n"
+                + "}\n";
+        o.sKRateCode
+                = " %midiCC%= _ccv;\n"
+                + "%trig% = ntrig;\n"
+                + "ntrig = 0;\n";
+        return o;
+    }
+
     static AxoObject Create_keyb() {
         AxoObject o = new AxoObject("keyb", "Monophonic MIDI keyboard note input, gate, velocity and release velocity");
         o.outlets.add(new OutletFrac32Bipolar("note", "midi note number (-64..63)"));
@@ -296,14 +349,29 @@ public class Midi extends gentools {
                 + "  _note = data1-64;\n"
                 + "  _gate = 1<<27;\n"
                 + "  _gate2 = 0;\n"
-                + "  PExModulationSourceChange(&parent->PExModulationSources[MODULATOR_attr_name_velocity][0],NMODULATIONTARGETS,_velo<<20);\n"
-                + "  PExModulationSourceChange(&parent->PExModulationSources[MODULATOR_attr_name_note][0],NMODULATIONTARGETS,_note<<21);\n"
+                + "  PExModulationSourceChange(\n"
+                + "    &parent->PExModulationSources[parent->MODULATOR_attr_name_velocity][0],\n"
+                + "    NMODULATIONTARGETS,\n"
+                + "    &parent->PExch[0],\n"
+                + "    &parent->PExModulationPrevVal[parent->polyIndex][parent->MODULATOR_attr_name_velocity],\n"
+                + "    _velo<<20);\n"
+                + "  PExModulationSourceChange(\n"
+                + "    &parent->PExModulationSources[parent->MODULATOR_attr_name_note][0],\n"
+                + "    NMODULATIONTARGETS,\n"
+                + "    &parent->PExch[0],\n"
+                + "    &parent->PExModulationPrevVal[parent->polyIndex][parent->MODULATOR_attr_name_note],\n"
+                + "    _note<<21);\n"
                 + "} else if (((status == MIDI_NOTE_ON + %midichannel%) && (!data2))||\n"
                 + "          (status == MIDI_NOTE_OFF + %midichannel%)) {\n"
                 + "  if (_note == data1-64) {\n"
                 + "    _rvelo = data2;\n"
                 + "    _gate = 0;\n"
-                + "  PExModulationSourceChange(&parent->PExModulationSources[MODULATOR_attr_name_releasevelocity][0],NMODULATIONTARGETS,_rvelo<<20);\n"
+                + "  PExModulationSourceChange(\n"
+                + "    &parent->PExModulationSources[parent->MODULATOR_attr_name_releasevelocity][0],\n"
+                + "    NMODULATIONTARGETS,\n"
+                + "    &parent->PExch[0],\n"
+                + "    &parent->PExModulationPrevVal[parent->polyIndex][parent->MODULATOR_attr_name_releasevelocity],\n"
+                + "    _rvelo<<20);\n"
                 + "  }\n"
                 + "} else if ((status == %midichannel% + MIDI_CONTROL_CHANGE)&&(data1 == MIDI_C_ALL_NOTES_OFF)) {\n"
                 + "  _gate = 0;\n"
@@ -545,6 +613,28 @@ public class Midi extends gentools {
         return o;
     }
 
+    static AxoObject Create_bendin2() {
+        AxoObject o = new AxoObject("bend hr", "Midi pitch bend input hi res");
+        o.sAuthor = "Mark Harris";
+        o.outlets.add(new OutletFrac32Bipolar("bend", "pitch bend, -64..64"));
+        o.outlets.add(new OutletBool32Pulse("trig", "trigger output"));
+        o.attributes.add(new AxoAttributeSpinner("ccl", 0, 127, 85));
+        o.sLocalData = "int32_t _bend,bendl;\n"
+                + "int32_t ntrig;\n";
+        o.sInitCode = "_bend = 0;bendl = 0;\n"
+                + "ntrig = 0;\n";
+        o.sMidiCode = "if (status == MIDI_PITCH_BEND + %midichannel%) {"
+                + "  _bend = (((int)((data2<<7)+data1)-0x2000)<<14) + bendl;\n"
+                + "  ntrig = 1;\n"
+                + "} else if ((status == %midichannel% + MIDI_CONTROL_CHANGE) && (data1 == %ccl%)) {\n"
+                + "   bendl = data2 << 7;\n"
+                + "}\n";
+        o.sKRateCode = "%bend% = _bend;\n"
+                + "%trig% = ntrig;\n"
+                + "ntrig = 0;\n";
+        return o;
+    }
+
     static AxoObject Create_bendin_ch() {
         AxoObject o = new AxoObject("bend ch", "Midi pitch bend input on specified channel");
         o.attributes.add(new AxoAttributeSpinner("channel", 1, 16, 0));
@@ -612,7 +702,6 @@ public class Midi extends gentools {
                 + "_pos = 0;\n"
                 + "_pos_shadow = 0;\n";
         o.sMidiCode = "if (status == MIDI_TIMING_CLOCK) {\n"
-                + "  _active = 1;\n"
                 + "  _pos_shadow++;\n"
                 + "  _pos = _pos_shadow;\n"
                 + "} else if (status == MIDI_START) {\n"
@@ -633,11 +722,11 @@ public class Midi extends gentools {
         return o;
     }
 
-    static String cdev[] = {"MIDI_DEVICE_DIN, 1", 
-        "MIDI_DEVICE_USB_HOST, 1", 
-        "MIDI_DEVICE_USB_HOST, 2", 
-        "MIDI_DEVICE_USB_HOST, 3", 
-        "MIDI_DEVICE_USB_HOST, 4", 
+    static String cdev[] = {"MIDI_DEVICE_DIN, 1",
+        "MIDI_DEVICE_USB_HOST, 1",
+        "MIDI_DEVICE_USB_HOST, 2",
+        "MIDI_DEVICE_USB_HOST, 3",
+        "MIDI_DEVICE_USB_HOST, 4",
         "MIDI_DEVICE_INTERNAL, 1",
         "MIDI_DEVICE_INTERNAL, 2",
         "MIDI_DEVICE_USB_DEVICE, 1"};
@@ -777,6 +866,18 @@ public class Midi extends gentools {
         o.inlets.add(new InletBool32Rising("trig", "trigger"));
         o.sLocalData = "int ntrig;\n";
         o.sKRateCode = "if ((%trig%>0) && !ntrig) {MidiSend3((midi_device_t) %device% , MIDI_PITCH_BEND + (%channel%-1),(%bend%>>14)&0x7F,(%bend%>>21)+64);  ntrig=1;}\n"
+                + "if (!(%trig%>0)) ntrig=0;\n";
+        return o;
+    }
+
+    static AxoObject Create_pgmout() {
+        AxoObject o = new AxoObject("pgm", "Midi program change output");
+        o.attributes.add(new AxoAttributeComboBox("device", udev, cdev));
+        o.attributes.add(new AxoAttributeSpinner("channel", 1, 16, 0));
+        o.inlets.add(new InletInt32Pos("pgm", "prgram number (0-127)"));
+        o.inlets.add(new InletBool32Rising("trig", "trigger"));
+        o.sLocalData = "int ntrig;\n";
+        o.sKRateCode = "if ((%trig%>0) && !ntrig) {MidiSend2((midi_device_t) %device% , MIDI_PROGRAM_CHANGE + (%channel%-1),%pgm%&0x7F); ntrig=1;}\n"
                 + "if (!(%trig%>0)) ntrig=0;\n";
         return o;
     }
@@ -922,7 +1023,7 @@ public class Midi extends gentools {
     }
 
     static AxoObject Create_mpe() {
-        AxoObject o = new AxoObject("mpe", "Controller input for MIDI Polyphonic Rxpression");
+        AxoObject o = new AxoObject("mpe", "Controller input for MIDI Polyphonic Expression");
         o.sAuthor = "Mark Harris";
         o.outlets.add(new OutletFrac32Bipolar("note", "midi note number (-64..63)"));
         o.outlets.add(new OutletBool32("gate", "key pressed, no retrigger legato"));
@@ -945,7 +1046,11 @@ public class Midi extends gentools {
                 + "uint8_t _lastRPN_LSB;\n"
                 + "uint8_t _lastRPN_MSB;\n"
                 + "uint8_t _bendRange;\n"
-                + "int32_t _pitch;\n";
+                + "int32_t _pitch;\n"
+                + "int32_t _xl,_yl,_zl;"
+                + "static const uint8_t xccl = 85;"
+                + "static const uint8_t yccl = 87;"
+                + "static const uint8_t zccl = 86;";
 
         o.sInitCode = "\n"
                 + "_gate = 0;\n"
@@ -953,7 +1058,8 @@ public class Midi extends gentools {
                 + "_pressure = 0;\n"
                 + "_bend = 0;\n"
                 + "_timbre = 0;\n"
-                + "_bendRange = 48;\n";
+                + "_bendRange = 48;\n"
+                + "_xl=_yl=_zl=0;\n";
 
         o.sMidiCode = "\n"
                 + "if ((status == MIDI_NOTE_ON + %midichannel%) && (data2)) {\n"
@@ -970,13 +1076,19 @@ public class Midi extends gentools {
                 + "    _pressure = 0;\n"
                 + "  }\n"
                 + "} else if (status == %midichannel% + MIDI_CHANNEL_PRESSURE) {\n"
-                + "  _pressure = data1<<20;\n"
+                + "  _pressure = (data1<<20) + _zl;\n"
                 + "} else if (status == %midichannel% + MIDI_PITCH_BEND) {\n"
-                + "  _bend = ((int)((data2<<7)+data1)-0x2000)<<14;\n"
+                + "  _bend = (((int)((data2<<7)+data1)-0x2000)<<14) + _xl;\n"
                 + "  _pitch = (_note << 21) + ((_bend >> 6)* _bendRange );\n"
                 + "} else if (status == %midichannel% + MIDI_CONTROL_CHANGE) {\n"
                 + "  if (data1 == MIDI_C_TIMBRE) {\n"
-                + "    _timbre = ((int)(data2<<7)-0x2000)<<14;\n"
+                + "    _timbre = (((int)(data2<<7)-0x2000)<<14) + _yl;\n"
+                + "  } else if (data1 == zccl) {\n"
+                + "   _zl = data2 << 13;"
+                + "  } else if (data1 == xccl) {\n"
+                + "   _xl = data2 << 7;"
+                + "  } else if (data1 == yccl) {\n"
+                + "   _yl = data2 << 14;"
                 + "  } else if(data1 == MIDI_C_ALL_NOTES_OFF) {\n"
                 + "    _gate = 0;\n"
                 + "  } else if (data1 == MIDI_C_RPN_MSB || data1 == MIDI_C_RPN_LSB || data1 == MIDI_C_DATA_ENTRY) {\n"

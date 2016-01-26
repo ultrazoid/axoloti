@@ -14,15 +14,23 @@
             <Property name="text" type="java.lang.String" value="File"/>
           </Properties>
           <SubComponents>
-            <MenuItem class="javax.swing.JMenuItem" name="jMenuNew">
+            <MenuItem class="javax.swing.JMenuItem" name="jMenuNewPatch">
               <Properties>
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
                   <Connection code="KeyStroke.getKeyStroke(KeyEvent.VK_N,&#xa;    Toolkit.getDefaultToolkit().getMenuShortcutKeyMask())" type="code"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="New"/>
+                <Property name="text" type="java.lang.String" value="New patch"/>
               </Properties>
               <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuNewActionPerformed"/>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuNewPatchActionPerformed"/>
+              </Events>
+            </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="jMenuNewBank">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="New patch bank"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuNewBankActionPerformed"/>
               </Events>
             </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="jMenuOpen">
@@ -44,14 +52,19 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuOpenURLActionPerformed"/>
               </Events>
             </MenuItem>
-            <Menu class="javax.swing.JMenu" name="jMenuLibrary">
+            <Menu class="axoloti.menus.RecentFileMenu" name="recentFileMenu1">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Open Recent"/>
+              </Properties>
+            </Menu>
+            <Menu class="axoloti.menus.LibraryMenu" name="libraryMenu1">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Library"/>
               </Properties>
             </Menu>
-            <Menu class="axoloti.menus.RecentFileMenu" name="recentFileMenu1">
+            <Menu class="axoloti.menus.FavouriteMenu" name="favouriteMenu1">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Open Recent"/>
+                <Property name="text" type="java.lang.String" value="Favorites"/>
               </Properties>
             </Menu>
             <MenuItem class="javax.swing.JPopupMenu$Separator" name="jSeparator2">
@@ -167,6 +180,14 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuItemPanicActionPerformed"/>
               </Events>
             </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="jMenuItemMount">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Enter card reader mode (disconnects editor)"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuItemMountActionPerformed"/>
+              </Events>
+            </MenuItem>
             <Menu class="javax.swing.JMenu" name="jMenuFirmware">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Firmware"/>
@@ -226,48 +247,12 @@
             </Menu>
           </SubComponents>
         </Menu>
-        <Menu class="javax.swing.JMenu" name="jMenuWindow">
-          <Properties>
-            <Property name="text" type="java.lang.String" value="Window"/>
-          </Properties>
-          <Events>
-            <EventHandler event="menuDeselected" listener="javax.swing.event.MenuListener" parameters="javax.swing.event.MenuEvent" handler="jMenuWindowMenuDeselected"/>
-            <EventHandler event="menuSelected" listener="javax.swing.event.MenuListener" parameters="javax.swing.event.MenuEvent" handler="jMenuWindowMenuSelected"/>
-          </Events>
+        <Menu class="axoloti.menus.WindowMenu" name="windowMenu1">
         </Menu>
-        <Menu class="javax.swing.JMenu" name="jMenuHelp">
+        <Menu class="axoloti.menus.HelpMenu" name="helpMenu1">
           <Properties>
             <Property name="text" type="java.lang.String" value="Help"/>
           </Properties>
-          <SubComponents>
-            <MenuItem class="javax.swing.JMenuItem" name="jMenuHelpContents">
-              <Properties>
-                <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
-                  <KeyStroke key="F1"/>
-                </Property>
-                <Property name="text" type="java.lang.String" value="Help Contents"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuHelpContentsActionPerformed"/>
-              </Events>
-            </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="jMenuAbout">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="About"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuAboutActionPerformed"/>
-              </Events>
-            </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="jMenuCommunity">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Community Website"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jMenuCommunityActionPerformed"/>
-              </Events>
-            </MenuItem>
-          </SubComponents>
         </Menu>
       </SubComponents>
     </Menu>

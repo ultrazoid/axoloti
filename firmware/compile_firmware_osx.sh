@@ -1,5 +1,5 @@
 #!/bin/sh
-export PATH=$PATH:${axoloti_runtime}/platform_osx/bin
+export PATH=${axoloti_runtime}/platform_osx/bin:$PATH
 
 echo "Compiling firmware... ${axoloti_firmware}"
 cd "${axoloti_firmware}"
@@ -16,3 +16,11 @@ cd flasher
 mkdir -p flasher_build/obj
 mkdir -p flasher_build/lst
 make
+cd ..
+
+echo "Compiling firmware mounter..."
+cd mounter
+mkdir -p mounter_build/obj
+mkdir -p mounter_build/lst
+make
+cd ..

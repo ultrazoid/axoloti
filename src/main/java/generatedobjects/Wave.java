@@ -47,7 +47,6 @@ public class Wave extends gentools {
 //UNRELEASED         WriteAxoObject(catName, Create_recWave2());
     }
 
-
     static AxoObject Create_playWaveMono() {
         AxoObject o = new AxoObject("play", "streaming playback of a mono .wav file from sdcard (testing)");
         o.inlets.add(new InletFrac32("pos", "position"));
@@ -61,11 +60,12 @@ public class Wave extends gentools {
                 + "   sdReadFilePingpong *stream;\n"
                 + "   int starttrig;\n"
                 + "   int stoptrig;\n";
-        o.sInitCode = "static sdReadFilePingpong s __attribute__ ((section (\".data\")));\n"
+        o.sInitCode = "static sdReadFilePingpong s[attr_poly] __attribute__ ((section (\".data\")));\n"
                 + "// unmap from aliased memory for DMA\n"
-                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s);\n"
+                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s[parent->polyIndex]);\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "starttrig = 0;\n"
                 + "stoptrig = 0;\n"
                 + "stream->pThreadSD = chThdCreateStatic(waThreadSD, sizeof(waThreadSD),\n"
@@ -112,11 +112,12 @@ public class Wave extends gentools {
                 + "   int starttrig;\n"
                 + "   int stoptrig;\n"
                 + "   char c[64];\n";
-        o.sInitCode = "static sdReadFilePingpong s __attribute__ ((section (\".data\")));\n"
+        o.sInitCode = "static sdReadFilePingpong s[attr_poly] __attribute__ ((section (\".data\")));\n"
                 + "// unmap from aliased memory for DMA\n"
-                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s);\n"
+                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s[parent->polyIndex]);\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "starttrig = 0;\n"
                 + "stoptrig = 0;\n"
                 + "strcpy(&c[0],\"%fn%\");\n"
@@ -164,11 +165,12 @@ public class Wave extends gentools {
                 + "   sdReadFilePingpong *stream;\n"
                 + "   int starttrig;\n"
                 + "   int stoptrig;\n";
-        o.sInitCode = "static sdReadFilePingpong s __attribute__ ((section (\".data\")));\n"
+        o.sInitCode = "static sdReadFilePingpong s[attr_poly] __attribute__ ((section (\".data\")));\n"
                 + "// unmap from aliased memory for DMA\n"
-                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s);\n"
+                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s[parent->polyIndex]);\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "starttrig = 0;\n"
                 + "stoptrig = 0;\n"
                 + "stream->pThreadSD = chThdCreateStatic(waThreadSD, sizeof(waThreadSD),\n"
@@ -222,11 +224,12 @@ public class Wave extends gentools {
                 + "   int starttrig;\n"
                 + "   int stoptrig;\n"
                 + "   char c[64];\n";
-        o.sInitCode = "static sdReadFilePingpong s __attribute__ ((section (\".data\")));\n"
+        o.sInitCode = "static sdReadFilePingpong s[attr_poly] __attribute__ ((section (\".data\")));\n"
                 + "// unmap from aliased memory for DMA\n"
-                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s);\n"
+                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s[parent->polyIndex]);\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "starttrig = 0;\n"
                 + "stoptrig = 0;\n"
                 + "strcpy(&c[0],\"%fn%\");\n"
@@ -281,11 +284,12 @@ public class Wave extends gentools {
                 + "   int starttrig;\n"
                 + "   int stoptrig;\n"
                 + "   char c[64];\n";
-        o.sInitCode = "static sdReadFilePingpong s __attribute__ ((section (\".data\")));\n"
+        o.sInitCode = "static sdReadFilePingpong s[attr_poly] __attribute__ ((section (\".data\")));\n"
                 + "// unmap from aliased memory for DMA\n"
-                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s);\n"
+                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s[parent->polyIndex]);\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "starttrig = 0;\n"
                 + "stoptrig = 0;\n"
                 + "strcpy(&c[0],\"%fn%\");\n"
@@ -335,7 +339,7 @@ public class Wave extends gentools {
                 + "        for(i=0;i<BUFSIZE;i++) %outl%[i] = %outr%[i]= 0;\n";
         o.sDisposeCode = "sdStopStreamer(stream);\n";
         return o;
-    }    
+    }
 
     static AxoObject Create_playWaveStereoPoly() {
         AxoObject o = new AxoObject("play stereo poly", "streaming playback of a stereo .wav file from sdcard. Special version for polyphonic subpatches! (testing)");
@@ -351,11 +355,12 @@ public class Wave extends gentools {
                 + "   sdReadFilePingpong *stream;\n"
                 + "   int starttrig;\n"
                 + "   int stoptrig;\n";
-        o.sInitCode = "static sdReadFilePingpong s __attribute__ ((section (\".data\")));\n"
+        o.sInitCode = "static sdReadFilePingpong s[attr_poly] __attribute__ ((section (\".data\")));\n"
                 + "// unmap from aliased memory for DMA\n"
-                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s);\n"
+                + "stream = (sdReadFilePingpong *)(0x20000000 | (int)&s[parent->polyIndex]);\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "starttrig = 0;\n"
                 + "stoptrig = 0;\n"
                 + "stream->pThreadSD = chThdCreateStatic(waThreadSD, sizeof(waThreadSD),\n"
@@ -393,8 +398,7 @@ public class Wave extends gentools {
         o.sDisposeCode = "sdStopStreamer(stream);\n";
         return o;
     }
-   
-    
+
     static AxoObject Create_playFlashWave() {
         AxoObject o = new AxoObject("flashplay", "Single-shot playback of a sample table in flash, without transposition");
         o.inlets.add(new InletBool32Rising("trig", "trigger"));
@@ -449,6 +453,7 @@ public class Wave extends gentools {
                 + "stream = &s;\n"
                 + "stream->pingpong = CLOSED;\n"
                 + "stream->doSeek = 0;\n"
+                + "stream->offset = -1;\n"
                 + "open_prev = 0;\n"
                 + "start_prev = 0;\n"
                 + "stop_prev = 0;\n"
@@ -484,7 +489,6 @@ public class Wave extends gentools {
         o.sDisposeCode = "sdStopStreamer(stream);\n";
         return o;
     }
-
 
     static AxoObject Create_FlashWaveRead() {
         AxoObject o = new AxoObject("flashread interp", "linear interpolated flash table read");

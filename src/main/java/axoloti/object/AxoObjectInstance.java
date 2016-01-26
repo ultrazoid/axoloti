@@ -114,21 +114,17 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
         if (this instanceof AxoObjectInstancePatcher) {
             ((AxoObjectInstancePatcher) this).updateObj1();
         }
-        if (parameterInstances == null) {
-            parameterInstances = new ArrayList<ParameterInstance>();
-        }
-        if (attributeInstances == null) {
-            attributeInstances = new ArrayList<AttributeInstance>();
-        }
-        if (displayInstances == null) {
-            displayInstances = new ArrayList<DisplayInstance>();
-        }
-        if (inletInstances == null) {
-            inletInstances = new ArrayList<InletInstance>();
-        }
-        if (outletInstances == null) {
-            outletInstances = new ArrayList<OutletInstance>();
-        }
+
+        ArrayList<ParameterInstance> pParameterInstances = parameterInstances;
+        ArrayList<AttributeInstance> pAttributeInstances = attributeInstances;
+        ArrayList<InletInstance> pInletInstances = inletInstances;
+        ArrayList<OutletInstance> pOutletInstances = outletInstances;
+        parameterInstances = new ArrayList<ParameterInstance>();
+        attributeInstances = new ArrayList<AttributeInstance>();
+        displayInstances = new ArrayList<DisplayInstance>();
+        inletInstances = new ArrayList<InletInstance>();
+        outletInstances = new ArrayList<OutletInstance>();
+
         setLayout(new BoxLayout(this, BoxLayout.PAGE_AXIS));
 
         final PopupIcon popupIcon = new PopupIcon();
@@ -267,12 +263,15 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
         JPanel p_iolets = new JPanel();
         p_iolets.setLayout(new BoxLayout(p_iolets, BoxLayout.LINE_AXIS));
         p_iolets.setAlignmentX(LEFT_ALIGNMENT);
+        p_iolets.setAlignmentY(TOP_ALIGNMENT);
         JPanel p_inlets = new JPanel();
         p_inlets.setLayout(new BoxLayout(p_inlets, BoxLayout.PAGE_AXIS));
         p_inlets.setAlignmentX(LEFT_ALIGNMENT);
+        p_inlets.setAlignmentY(TOP_ALIGNMENT);
         JPanel p_outlets = new JPanel();
         p_outlets.setLayout(new BoxLayout(p_outlets, BoxLayout.PAGE_AXIS));
         p_outlets.setAlignmentX(RIGHT_ALIGNMENT);
+        p_outlets.setAlignmentY(TOP_ALIGNMENT);
         p_params = new JPanel();
         if (getType().getRotatedParams()) {
             p_params.setLayout(new BoxLayout(p_params, BoxLayout.LINE_AXIS));
@@ -288,34 +287,55 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
         p_displays.add(Box.createHorizontalGlue());
         p_params.add(Box.createHorizontalGlue());
 
-//        inletInstances = new ArrayList<InletInstance>();
-//        outletInstances =
         for (Inlet inl : getType().inlets) {
-            InletInstance inlin = GetInletInstance(inl.name);
-            if (inlin == null) {
-                inlin = new InletInstance(inl, this);
-                inletInstances.add(inlin);
+            InletInstance inlinp = null;
+            for (InletInstance inlin1 : pInletInstances) {
+                if (inlin1.GetLabel().equals(inl.getName())) {
+                    inlinp = inlin1;
+                }
             }
+            InletInstance inlin = new InletInstance(inl, this);
+            if (inlinp != null) {
+                Net n = getPatch().GetNet(inlinp);
+                if (n != null) {
+                    n.connectInlet(inlin);
+                }
+                getPatch().disconnect(inlinp);
+                inletInstances.remove(inlinp);
+            }
+            inletInstances.add(inlin);
             inlin.setAlignmentX(LEFT_ALIGNMENT);
             p_inlets.add(inlin);
         }
 
         for (Outlet o : getType().outlets) {
-            OutletInstance oin = GetOutletInstance(o.name);
-            if (oin == null) {
-                oin = new OutletInstance(o, this);
-                outletInstances.add(oin);
+            OutletInstance oinp = null;
+            for (OutletInstance oinp1 : pOutletInstances) {
+                if (oinp1.GetLabel().equals(o.getName())) {
+                    oinp = oinp1;
+                }
             }
+            OutletInstance oin = new OutletInstance(o, this);
+            if (oinp != null) {
+                Net n = getPatch().GetNet(oinp);
+                if (n != null) {
+                    n.connectOutlet(oin);
+                }
+                getPatch().disconnect(oinp);
+                outletInstances.remove(oinp);
+            }
+            outletInstances.add(oin);
             oin.setAlignmentX(RIGHT_ALIGNMENT);
             p_outlets.add(oin);
-        }/*
+        }
+
+        /*
          if (p_inlets.getComponents().length == 0){
          p_inlets.add(Box.createHorizontalGlue());
          }
          if (p_outlets.getComponents().length == 0){
          p_outlets.add(Box.createHorizontalGlue());
          }*/
-
         p_iolets.add(p_inlets);
         p_iolets.add(Box.createHorizontalGlue());
         p_iolets.add(p_outlets);
@@ -323,7 +343,13 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
 //        p_iolets.setBackground(Color.red);
 
         for (AxoAttribute p : getType().attributes) {
-            AttributeInstance attri = p.CreateInstance(this);
+            AttributeInstance attrp1 = null;
+            for (AttributeInstance attrp : pAttributeInstances) {
+                if (attrp.getName().equals(p.getName())) {
+                    attrp1 = attrp;
+                }
+            }
+            AttributeInstance attri = p.CreateInstance(this, attrp1);
             attri.setAlignmentX(LEFT_ALIGNMENT);
             add(attri);
             attri.doLayout();
@@ -332,36 +358,18 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
 
         for (Parameter p : getType().params) {
             ParameterInstance pin = p.CreateInstance(this);
+            for (ParameterInstance pinp : pParameterInstances) {
+                if (pinp.getName().equals(pin.getName())) {
+                    pin.CopyValueFrom(pinp);
+                }
+            }
+            pin.PostConstructor();
             pin.setAlignmentX(RIGHT_ALIGNMENT);
             pin.doLayout();
             parameterInstances.add(pin);
         }
-        boolean cont;
-        do {
-            cont = false;
-            for (ParameterInstance pi : parameterInstances) {
-                if (pi.axoObj == null) {
-                    parameterInstances.remove(pi);
-                    Logger.getLogger(AxoObjectInstance.class.getName()).log(Level.SEVERE, "Unresolved parameter {0}:{1}", new Object[]{getInstanceName(), pi.name});
-                    cont = true;
-                    break;
-                }
-            }
-        } while (cont);
-        do {
-            cont = false;
-            for (AttributeInstance pi : attributeInstances) {
-                if (pi.axoObj == null) {
-                    attributeInstances.remove(pi);
-                    Logger.getLogger(AxoObjectInstance.class.getName()).log(Level.SEVERE, "Unresolved attribute {0}:{1}", new Object[]{getInstanceName(), pi.getAttributeName()});
-                    cont = true;
-                    break;
-                }
-            }
-        } while (cont);
 
         for (Display p : getType().displays) {
-            System.out.println(p.toString());
             DisplayInstance pin = p.CreateInstance(this);
             pin.setAlignmentX(RIGHT_ALIGNMENT);
             pin.doLayout();
@@ -409,10 +417,9 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
         for (InletInstance o : inletInstances) {
             if (n.equals(o.GetLabel())) {
                 return o;
-            }
-            else {
+            } else {
                 String s = Synonyms.instance().inlet(n);
-                if(o.GetLabel().equals(s)) {
+                if (o.GetLabel().equals(s)) {
                     return o;
                 }
             }
@@ -425,10 +432,9 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
         for (OutletInstance o : outletInstances) {
             if (n.equals(o.GetLabel())) {
                 return o;
-            }
-            else {
+            } else {
                 String s = Synonyms.instance().outlet(n);
-                if(o.GetLabel().equals(s)) {
+                if (o.GetLabel().equals(s)) {
                     return o;
                 }
             }
@@ -525,7 +531,7 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
         c += "parent = _parent;\n";
         for (ParameterInstance p : parameterInstances) {
             if (p.parameter.PropagateToChild != null) {
-                c += "// on Parent: propagate " + p.name + " " + enableOnParent + " " + getLegalName() + "" + p.parameter.PropagateToChild + "\n";
+                c += "// on Parent: propagate " + p.getName() + " " + enableOnParent + " " + getLegalName() + "" + p.parameter.PropagateToChild + "\n";
                 c += p.PExName("parent->") + ".pfunction = PropagateToSub;\n";
                 c += p.PExName("parent->") + ".finalvalue = (int32_t)(&(parent->instance"
                         + getLegalName() + "_i.PExch[instance" + getLegalName() + "::PARAM_INDEX_"
@@ -635,7 +641,7 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
 
             s = s.replace("attr_name", getCInstanceName());
             s = s.replace("attr_legal_name", getLegalName());
-           
+
             return s;
         }
         return "";
@@ -791,7 +797,7 @@ public class AxoObjectInstance extends AxoObjectInstanceAbstract {
             if (d == null) {
                 continue;
             }
-            String name = j.getInlet().name;
+            String name = j.getInlet().getName();
             for (int i = 0; i < candidates.size(); i++) {
                 AxoObjectAbstract o = candidates.get(i);
                 Inlet i2 = o.GetInlet(name);

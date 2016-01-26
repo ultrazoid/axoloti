@@ -17,14 +17,13 @@
  */
 package axoloti.parameters;
 
-import axoloti.datatypes.Int32;
 import java.security.MessageDigest;
 
 /**
  *
  * @author Johannes Taelman
  */
-public class ParameterBin1Momentary extends Parameter<Int32> {
+public class ParameterBin1Momentary extends Parameter {
 
     public ParameterBin1Momentary() {
     }
